@@ -4,8 +4,8 @@
 lfg [agent cmd] [branch_name]
 ```
 
-- `entrypoint`: the command to run once inside the worktree (default: `claude`).
-  - `lfg`               → `claude` in a picked branch
+- `entrypoint`: the command to run once inside the worktree (default: `${LFG_DEFAULT_AGENT_COMMAND:-claude}`).
+  - `lfg`               → default agent in a picked branch
   - `lfg codex`         → `codex` in a picked branch
   - `lfg claude feat/x` → `claude` in worktree for branch `feat/x`
 
@@ -45,9 +45,17 @@ lfgwt remove|rm <branch_name>
 `lfgwt prune` removes worktrees that are:
 
 - missing their directory,
-- older than 1 day, or
+- older than `${LFG_PRUNE_OLDER_THAN_DAYS:-1}` day(s), or
 - not backed by a remote branch.
+
+## Environment variables
+
+- `LFG_SOURCE_DIR` — root directory scanned for repos when `lfg` is run outside a git repo. Defaults to `~/src`.
+- `LFG_PRUNE_OLDER_THAN_DAYS` — worktrees older than this many days are pruned. Defaults to `1`.
+- `LFG_DEFAULT_AGENT_COMMAND` — agent launched by `lfg` when no entrypoint is given. Defaults to `claude`.
+- `LFG_FZF_HIGHLIGHT_COLOR` — highlight color passed to fzf. Defaults to `green`.
+- `LFG_INSTALL_DIR` — directory used by `install.sh`. Defaults to `~/.config/lfg`.
 
 ## Shell integration
 
-Source `lfg.zsh` from your shell configuration to load the `lfg` and `lfgwt` commands plus their zsh completions.
+Run `./install.sh` to symlink `lfg.zsh` into `~/.config/lfg` and source it from `~/.zshrc`, or source `lfg.zsh` manually from your shell configuration to load the `lfg` and `lfgwt` commands plus their zsh completions.
