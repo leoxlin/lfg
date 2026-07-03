@@ -500,7 +500,7 @@ function lfg() {
 
 function _lfg_complete() {
   case "$CURRENT" in
-    2) _values 'entrypoint' 'claude' 'codex' ;;
+    2) _values 'entrypoint' 'claude' 'claude-code' 'codex' 'aider' 'gemini' ;;
     3) _worktree_branches ;;
   esac
 }
