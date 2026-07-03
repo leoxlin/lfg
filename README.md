@@ -7,13 +7,13 @@ Jump into a git worktree and start a coding agent.
 ### Quick install (bash)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
 ```
 
 ### Clone and run the installer
 
 ```bash
-git clone https://github.com/<user>/lfg.git ~/.config/lfg-repo
+git clone https://github.com/leoxlin/lfg.git ~/.config/lfg-repo
 cd ~/.config/lfg-repo
 ./install.sh
 ```
@@ -30,7 +30,7 @@ cd ~/.config/lfg-repo
 ### Oh My Zsh plugin
 
 ```zsh
-git clone https://github.com/<user>/lfg.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/lfg
+git clone https://github.com/leoxlin/lfg.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/lfg
 ```
 
 Then add `lfg` to the plugins array in `~/.zshrc`:
