@@ -55,7 +55,68 @@ lfgwt remove|rm <branch_name>
 - `LFG_DEFAULT_AGENT_COMMAND` — agent launched by `lfg` when no entrypoint is given. Defaults to `claude`.
 - `LFG_FZF_HIGHLIGHT_COLOR` — highlight color passed to fzf. Defaults to `green`.
 - `LFG_INSTALL_DIR` — directory used by `install.sh`. Defaults to `~/.config/lfg`.
+- `LFG_REPO_URL` — git URL cloned by `install.sh` when run remotely. Defaults to `https://github.com/llin/lfg.git`.
 
-## Shell integration
+## Shell support
 
-Run `./install.sh` to symlink `lfg.zsh` into `~/.config/lfg` and source it from `~/.zshrc`, or source `lfg.zsh` manually from your shell configuration to load the `lfg` and `lfgwt` commands plus their zsh completions.
+`lfg` supports zsh, bash, and fish.
+
+| Shell | Files | Completion |
+|-------|-------|------------|
+| zsh | `lfg.zsh` | zsh compsys (`compdef`) |
+| bash | `lfg.bash` | bash `complete -F` |
+| fish | `functions/lfg.fish`, `functions/lfgwt.fish` | `completions/lfg.fish`, `completions/lfgwt.fish` |
+
+## Installation
+
+### Local install
+
+Run `./install.sh` from a local clone. The installer auto-detects the current shell unless a method flag is passed.
+
+```zsh
+./install.sh              # auto-detect
+./install.sh --zsh        # install for zsh
+./install.sh --bash       # install for bash
+./install.sh --fish       # install for fish
+./install.sh --oh-my-zsh  # install as an Oh My Zsh plugin
+```
+
+### Remote install
+
+`install.sh` can be piped from a URL. It clones the repository into `~/.config/lfg/repo` and installs from there. Override the repository URL with `LFG_REPO_URL` or `--repo-url`.
+
+```bash
+curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | bash -s -- --fish
+LFG_REPO_URL=https://github.com/<user>/lfg.git curl -sSL ... | bash
+```
+
+### Oh My Zsh plugin
+
+Install as a custom plugin:
+
+```zsh
+git clone https://github.com/<user>/lfg.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/lfg
+```
+
+Then add `lfg` to the plugins array in `~/.zshrc`:
+
+```zsh
+plugins=(... lfg)
+```
+
+The plugin entry point is `lfg.plugin.zsh`.
+
+### Manual install
+
+Source the appropriate file for your shell from your shell configuration:
+
+```zsh
+source /path/to/lfg/lfg.zsh
+```
+
+```bash
+source /path/to/lfg/lfg.bash
+```
+
+For fish, copy `functions/` and `completions/` into `~/.config/fish/` and reload.

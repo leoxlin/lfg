@@ -121,11 +121,12 @@ function _worktree_branch_has_remote() {
 
   output="$(git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null)"
 
-  for remote_branch in ${(f)output}; do
+  while IFS= read -r remote_branch; do
+    [ -n "$remote_branch" ] || continue
     if [ "${remote_branch#*/}" = "$branch" ]; then
       return 0
     fi
-  done
+  done <<< "$output"
 
   return 1
 }
@@ -250,7 +251,7 @@ function _worktree_list() {
     _worktree_list_row
   } | column -t -s $'\t'
 
-  unfunction _worktree_list_row
+  unset -f _worktree_list_row
 }
 
 function _worktree_add() {
@@ -316,7 +317,7 @@ function _worktree_remove() {
 }
 
 function _worktree_prune() {
-  local parent worktree_path branch_ref branch_name line removed failed reason
+  local parent worktree_path branch_ref branch_name line removed failed
 
   _worktree_require_git_repo || return 1
 
@@ -370,7 +371,7 @@ function _worktree_prune() {
 
   _worktree_prune_process "$worktree_path" "$branch_ref"
 
-  unfunction _worktree_prune_process
+  unset -f _worktree_prune_process
 
   git -C "$parent" worktree prune || return 1
   if [ "$removed" -eq 0 ] && [ "$failed" -eq 0 ]; then
@@ -420,44 +421,28 @@ function lfgwt() {
   esac
 }
 
-function _worktree_branches() {
-  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    _values 'branch' $(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
+# Bash completions
+function _lfgwt_completion() {
+  local cur prev commands branches
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+  commands="add cd list ls prune remove rm help"
+
+  if [ "$COMP_CWORD" -eq 1 ]; then
+    COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
+  else
+    case "$prev" in
+      add|cd|remove|rm)
+        branches="$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)"
+        COMPREPLY=( $(compgen -W "$branches" -- "$cur") )
+        ;;
+    esac
   fi
 }
 
-function _worktree_complete() {
-  local curcontext="$curcontext" state line
-  typeset -A opt_args
-
-  _arguments -C \
-    '1: :->command' \
-    '2: :->arg1'
-
-  case "$state" in
-    command)
-      _values 'lfgwt command' \
-        'add[create or switch to a worktree]' \
-        'cd[change to or create a worktree]' \
-        'list[list worktrees]' \
-        'ls[list worktrees]' \
-        'prune[remove stale worktrees]' \
-        'remove[remove a worktree]' \
-        'rm[remove a worktree]'
-      ;;
-    arg1)
-      case "$line[1]" in
-        add|cd|remove|rm)
-          _worktree_branches
-          ;;
-      esac
-      ;;
-  esac
-}
-
-if (( $+functions[compdef] )); then
-  compdef _worktree_complete lfgwt
-fi
+complete -F _lfgwt_completion lfgwt
 
 # True when the current directory is a linked worktree (not the main checkout).
 function _lfg_in_worktree() {
@@ -500,13 +485,20 @@ function lfg() {
   "$entrypoint"
 }
 
-function _lfg_complete() {
-  case "$CURRENT" in
-    2) _values 'entrypoint' 'claude' 'claude-code' 'codex' 'aider' 'gemini' ;;
-    3) _worktree_branches ;;
+function _lfg_completion() {
+  local cur branches
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+
+  case "$COMP_CWORD" in
+    1)
+      COMPREPLY=( $(compgen -W "claude claude-code codex aider gemini" -- "$cur") )
+      ;;
+    2)
+      branches="$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)"
+      COMPREPLY=( $(compgen -W "$branches" -- "$cur") )
+      ;;
   esac
 }
 
-if (( $+functions[compdef] )); then
-  compdef _lfg_complete lfg
-fi
+complete -F _lfg_completion lfg
