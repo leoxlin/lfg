@@ -332,8 +332,8 @@ function _worktree_prune() {
 
     if [ ! -d "$worktree_path" ]; then
       reason="missing directory"
-    elif _worktree_is_older_than_days "$worktree_path" 1; then
-      reason="older than 1 day"
+    elif _worktree_is_older_than_days "$worktree_path" "${LFG_PRUNE_OLDER_THAN_DAYS:-1}"; then
+      reason="older than ${LFG_PRUNE_OLDER_THAN_DAYS:-1} day(s)"
     elif ! _worktree_branch_has_remote "$branch_name"; then
       reason="no remote branch"
     else
