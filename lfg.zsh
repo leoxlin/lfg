@@ -1,0 +1,504 @@
+# lfg: jump into a worktree and start an agent.
+#
+# Usage: lfg [entrypoint] [branch_name]
+#
+# - entrypoint: the command to run once inside the worktree (default: claude).
+#     lfg               -> claude in a picked branch
+#     lfg codex         -> codex in a picked branch
+#     lfg claude feat/x -> claude in worktree for branch feat/x
+# - Outside a git repo: pick one from $LFG_SOURCE_DIR via fzf (type to filter).
+# - With no branch: pick an existing worktree branch, or type a new name to
+#   create one.
+# - Creates/switches the worktree (under $LFG_SOURCE_DIR/.agents/worktrees, via
+#   the worktree helper) and launches the entrypoint there. LFG_SOURCE_DIR
+#   defaults to ~/src if unset.
+#
+# Worktree helper conventions:
+#
+# - All commands must be run from inside a git repository and operate on that
+#   repo only.
+#
+# - Branch-related commands (add, cd, remove/rm) take a single <branch> argument.
+#
+# - Repo-wide commands (list, ls, prune) take no arguments.
+#
+# - Worktrees are created under $LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>
+#   and reused by branch. LFG_SOURCE_DIR defaults to ~/src if unset.
+#
+# - If mise is installed, entering a worktree auto-trusts its mise config when
+#   it is not already trusted. This prevents mise's chpwd hook from erroring.
+
+function _worktree_usage() {
+  echo "usage: worktree                      (interactive: pick branch/worktree; repo selection only when outside a repo)"
+  echo "       worktree add <branch_name>"
+  echo "       worktree cd <branch_name>"
+  echo "       worktree list"
+  echo "       worktree ls"
+  echo "       worktree prune"
+  echo "       worktree remove|rm <branch_name>"
+  echo ""
+  echo "cd creates the worktree if it does not already exist."
+}
+
+function _worktree_require_git_repo() {
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo 'fatal: not a git repository (or any parent up to mount point /)' >&2
+    return 1
+  fi
+}
+
+function _worktree_default_ref() {
+  local default_ref
+
+  default_ref="$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)"
+  if [ -n "$default_ref" ]; then
+    echo "$default_ref"
+  elif git show-ref --verify --quiet refs/heads/main; then
+    echo "main"
+  elif git show-ref --verify --quiet refs/remotes/origin/main; then
+    echo "origin/main"
+  elif git show-ref --verify --quiet refs/heads/master; then
+    echo "master"
+  elif git show-ref --verify --quiet refs/remotes/origin/master; then
+    echo "origin/master"
+  else
+    echo "HEAD"
+  fi
+}
+
+function _worktree_sources_dir() {
+  local sources_dir="${LFG_SOURCE_DIR:-$HOME/src}"
+  echo "${sources_dir}"
+}
+
+function _worktree_base_dir() {
+  echo "$(_worktree_sources_dir)/.agents/worktrees"
+}
+
+function _worktree_parent_path() {
+  git worktree list --porcelain | awk 'NR==1 { sub(/^worktree /, ""); print }'
+}
+
+function _worktree_path_for_branch() {
+  local branch="$1"
+
+  git worktree list --porcelain | awk -v branch="$branch" '
+    /^worktree / { path = $0; sub(/^worktree /, "", path) }
+    /^branch / { ref = $0; sub(/^branch /, "", ref); if (ref == "refs/heads/" branch) { print path; exit } }
+  '
+}
+
+function _worktree_new_path() {
+  local branch root repo
+
+  branch="$1"
+  root="$(_worktree_parent_path)" || return 1
+  repo="$(basename "$root")"
+
+  echo "$(_worktree_base_dir)/$repo-${branch//\//-}"
+}
+
+function _worktree_branch_name() {
+  local ref
+
+  ref="$1"
+  if [ -z "$ref" ]; then
+    echo "(detached)"
+  elif [[ "$ref" == refs/heads/* ]]; then
+    echo "${ref#refs/heads/}"
+  else
+    echo "$ref"
+  fi
+}
+
+function _worktree_branch_has_remote() {
+  local branch="$1"
+  local remote_branch output
+
+  if [ -z "$branch" ] || [ "$branch" = "(detached)" ]; then
+    return 1
+  fi
+
+  output="$(git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null)"
+
+  for remote_branch in ${(f)output}; do
+    if [ "${remote_branch#*/}" = "$branch" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+function _worktree_is_older_than_days() {
+  local worktree_path days
+
+  worktree_path="$1"
+  days="$2"
+
+  [ -d "$worktree_path" ] || return 1
+  [ -n "$(find "$worktree_path" -prune -mtime +"$days" -print 2>/dev/null)" ]
+}
+
+function _worktree_mise_trust_if_untrusted() {
+  local worktree_path="$1"
+
+  command -v mise >/dev/null 2>&1 || return 0
+
+  if mise trust --show -C "$worktree_path" 2>/dev/null | grep -q ': untrusted'; then
+    mise trust -y -q -C "$worktree_path"
+  fi
+}
+
+function _worktree_cd() {
+  local branch="$1"
+
+  if [ -z "$branch" ]; then
+    echo "You must provide a branch for worktree" >&2
+    _worktree_usage >&2
+    return 1
+  fi
+
+  _worktree_add "$branch"
+}
+
+function _worktree_pick_repo() {
+  local repo
+
+  repo="$(find "$(_worktree_sources_dir)" -mindepth 1 -maxdepth 1 -type d \
+      -exec test -e '{}/.git' ';' -print 2>/dev/null \
+    | sort \
+    | fzf --prompt='repo> ' --height=40% --reverse \
+        --delimiter=/ --with-nth=-1)" || return 1
+
+  [ -n "$repo" ] || return 1
+  echo "$repo"
+}
+
+function _worktree_pick_branch() {
+  local out code branch
+
+  out="$(git worktree list --porcelain \
+    | awk '/^branch / { sub("refs/heads/", "", $2); print $2 }' \
+    | fzf --print-query --prompt='worktree> ' --height=40% --reverse)"
+  code=$?
+
+  # 0 = picked existing, 1 = no match (create new); anything else = aborted.
+  [ "$code" -eq 0 ] || [ "$code" -eq 1 ] || return 1
+
+  branch="$(printf '%s\n' "$out" | tail -n1)"
+  [ -n "$branch" ] || return 1
+  echo "$branch"
+}
+
+function _worktree_interactive_cd() {
+  local repo branch
+
+  if ! command -v fzf >/dev/null 2>&1; then
+    echo "worktree: fzf is required for interactive mode" >&2
+    return 1
+  fi
+
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    repo="$(_worktree_pick_repo)" || return 1
+    cd "$repo" || return 1
+  fi
+
+  branch="$(_worktree_pick_branch)" || return 1
+
+  _worktree_add "$branch"
+}
+
+function _worktree_list() {
+  local current_root worktree_path branch_ref branch_name marker line
+
+  _worktree_require_git_repo || return 1
+
+  current_root="$(git rev-parse --show-toplevel 2>/dev/null)" || current_root=""
+  worktree_path=""
+  branch_ref=""
+
+  _worktree_list_row() {
+    [ -n "$worktree_path" ] || return
+    branch_name="$(_worktree_branch_name "$branch_ref")"
+    if [ "$worktree_path" = "$current_root" ]; then
+      marker="*"
+    else
+      marker=" "
+    fi
+    printf "%s %s\t%s\n" "$marker" "$branch_name" "$worktree_path"
+  }
+
+  {
+    while IFS= read -r line; do
+      if [ -z "$line" ]; then
+        _worktree_list_row
+        worktree_path=""
+        branch_ref=""
+      elif [[ "$line" == worktree\ * ]]; then
+        worktree_path="${line#worktree }"
+      elif [[ "$line" == branch\ * ]]; then
+        branch_ref="${line#branch }"
+      fi
+    done < <(git worktree list --porcelain)
+    _worktree_list_row
+  } | column -t -s $'\t'
+
+  unfunction _worktree_list_row
+}
+
+function _worktree_add() {
+  local branch worktree_path default_ref
+
+  branch="$1"
+  if [ -z "$branch" ]; then
+    echo "You must provide a branch for worktree" >&2
+    _worktree_usage >&2
+    return 1
+  fi
+
+  _worktree_require_git_repo || return 1
+
+  worktree_path="$(_worktree_path_for_branch "$branch")" || return 1
+  if [ -n "$worktree_path" ]; then
+    _worktree_mise_trust_if_untrusted "$worktree_path"
+    cd "$worktree_path" || return 1
+    return 0
+  fi
+
+  worktree_path="$(_worktree_new_path "$branch")" || return 1
+  mkdir -p "$(dirname "$worktree_path")" || return 1
+
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    git worktree add "$worktree_path" "$branch" || return 1
+  else
+    default_ref="$(_worktree_default_ref)" || return 1
+    git worktree add -b "$branch" "$worktree_path" "$default_ref" || return 1
+  fi
+
+  worktree_path="$(_worktree_path_for_branch "$branch")" || return 1
+  if [ -z "$worktree_path" ]; then
+    echo "fatal: could not find worktree for branch '$branch'" >&2
+    return 1
+  fi
+
+  _worktree_mise_trust_if_untrusted "$worktree_path"
+  cd "$worktree_path" || return 1
+}
+
+function _worktree_remove() {
+  local branch parent worktree_path
+
+  branch="$1"
+  if [ -z "$branch" ]; then
+    echo "You must provide a branch for worktree" >&2
+    _worktree_usage >&2
+    return 1
+  fi
+
+  _worktree_require_git_repo || return 1
+
+  parent="$(_worktree_parent_path)" || return 1
+  worktree_path="$(_worktree_path_for_branch "$branch")" || return 1
+  if [ -z "$worktree_path" ]; then
+    echo "fatal: no worktree found for branch '$branch'" >&2
+    return 1
+  fi
+
+  git -C "$parent" worktree remove "$worktree_path" || return 1
+  git -C "$parent" worktree prune
+}
+
+function _worktree_prune() {
+  local parent worktree_path branch_ref branch_name line removed failed reason
+
+  _worktree_require_git_repo || return 1
+
+  parent="$(_worktree_parent_path)" || return 1
+
+  worktree_path=""
+  branch_ref=""
+  removed=0
+  failed=0
+
+  _worktree_prune_process() {
+    local worktree_path="$1" branch_ref="$2"
+    local branch_name reason
+
+    [ -n "$worktree_path" ] || return
+    [ "$worktree_path" != "$parent" ] || return
+
+    branch_name="$(_worktree_branch_name "$branch_ref")"
+
+    if [ ! -d "$worktree_path" ]; then
+      reason="missing directory"
+    elif _worktree_is_older_than_days "$worktree_path" 1; then
+      reason="older than 1 day"
+    elif ! _worktree_branch_has_remote "$branch_name"; then
+      reason="no remote branch"
+    else
+      return
+    fi
+
+    printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
+    if [ ! -d "$worktree_path" ]; then
+      removed=1
+    elif git -C "$parent" worktree remove "$worktree_path"; then
+      removed=1
+    else
+      failed=1
+    fi
+  }
+
+  while IFS= read -r line; do
+    if [ -z "$line" ]; then
+      _worktree_prune_process "$worktree_path" "$branch_ref"
+      worktree_path=""
+      branch_ref=""
+    elif [[ "$line" == worktree\ * ]]; then
+      worktree_path="${line#worktree }"
+    elif [[ "$line" == branch\ * ]]; then
+      branch_ref="${line#branch }"
+    fi
+  done < <(git -C "$parent" worktree list --porcelain)
+
+  _worktree_prune_process "$worktree_path" "$branch_ref"
+
+  unfunction _worktree_prune_process
+
+  git -C "$parent" worktree prune || return 1
+  if [ "$removed" -eq 0 ] && [ "$failed" -eq 0 ]; then
+    echo "No stale worktrees found."
+  fi
+
+  return "$failed"
+}
+
+function worktree() {
+  local command
+
+  if [ $# -gt 0 ]; then
+    command="$1"
+    shift
+  else
+    command=""
+  fi
+
+  case "$command" in
+    add)
+      _worktree_add "$@"
+      ;;
+    cd)
+      _worktree_cd "$@"
+      ;;
+    list|ls)
+      _worktree_list "$@"
+      ;;
+    prune)
+      _worktree_prune "$@"
+      ;;
+    remove|rm)
+      _worktree_remove "$@"
+      ;;
+    "")
+      _worktree_interactive_cd
+      ;;
+    help|-h|--help)
+      _worktree_usage
+      ;;
+    *)
+      echo "unknown worktree command: $command" >&2
+      _worktree_usage >&2
+      return 1
+      ;;
+  esac
+}
+
+alias wt='worktree'
+
+function _worktree_branches() {
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    _values 'branch' $(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
+  fi
+}
+
+function _worktree_complete() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  _arguments -C \
+    '1: :->command' \
+    '2: :->arg1'
+
+  case "$state" in
+    command)
+      _values 'worktree command' \
+        'add[create or switch to a worktree]' \
+        'cd[change to or create a worktree]' \
+        'list[list worktrees]' \
+        'ls[list worktrees]' \
+        'prune[remove stale worktrees]' \
+        'remove[remove a worktree]' \
+        'rm[remove a worktree]'
+      ;;
+    arg1)
+      case "$line[1]" in
+        add|cd|remove|rm)
+          _worktree_branches
+          ;;
+      esac
+      ;;
+  esac
+}
+
+compdef _worktree_complete worktree wt
+
+# True when the current directory is a linked worktree (not the main checkout).
+function _lfg_in_worktree() {
+  local git_dir common_dir
+
+  git_dir="$(git rev-parse --absolute-git-dir 2>/dev/null)" || return 1
+  common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+
+  [ "$git_dir" != "$common_dir" ]
+}
+
+function lfg() {
+  local entrypoint branch repo
+
+  entrypoint="${1:-claude}"
+  branch="$2"
+
+  if ! command -v "$entrypoint" >/dev/null 2>&1; then
+    echo "lfg: entrypoint not found on PATH: $entrypoint" >&2
+    return 1
+  fi
+
+  # Already in a worktree with no branch requested: just launch here.
+  if [ -z "$branch" ] && _lfg_in_worktree; then
+    "$entrypoint"
+    return
+  fi
+
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    repo="$(_worktree_pick_repo)" || return 1
+    cd "$repo" || return 1
+  fi
+
+  if [ -z "$branch" ]; then
+    branch="$(_worktree_pick_branch)" || return 1
+  fi
+
+  _worktree_add "$branch" || return 1
+
+  "$entrypoint"
+}
+
+function _lfg_complete() {
+  case "$CURRENT" in
+    2) _values 'entrypoint' 'claude' 'codex' ;;
+    3) _worktree_branches ;;
+  esac
+}
+
+compdef _lfg_complete lfg
