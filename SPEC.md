@@ -13,21 +13,21 @@ lfg [agent cmd] [branch_name]
 
 - Outside a git repo: pick one from `$LFG_SOURCE_DIR` via `fzf` (type to filter).
 - With no branch: pick an existing worktree branch, or type a new name to create one.
-- Creates/switches the worktree (under `$LFG_SOURCE_DIR/.agents/worktrees`, via the `worktree` helper) and launches the entrypoint there.
+- Creates/switches the worktree (under `$LFG_SOURCE_DIR/.agents/worktrees`, via the `lfgwt` helper) and launches the entrypoint there.
 - `LFG_SOURCE_DIR` defaults to `~/src` if unset.
 
 ## Worktree helper
 
-The `worktree` (aliased to `wt`) helper manages branch-specific worktrees.
+The `lfgwt` helper manages branch-specific worktrees.
 
 ```
-worktree                      # interactive: pick branch/worktree
-worktree add <branch_name>    # create or switch to a worktree
-worktree cd <branch_name>     # change to or create a worktree
-worktree list                 # list worktrees
-worktree ls                   # alias for list
-worktree prune                # remove stale worktrees
-worktree remove|rm <branch_name>
+lfgwt                         # interactive: pick branch/worktree
+lfgwt add <branch_name>       # create or switch to a worktree
+lfgwt cd <branch_name>        # change to or create a worktree
+lfgwt list                    # list worktrees
+lfgwt ls                      # alias for list
+lfgwt prune                   # remove stale worktrees
+lfgwt remove|rm <branch_name>
 ```
 
 `cd` creates the worktree if it does not already exist.
@@ -42,7 +42,7 @@ worktree remove|rm <branch_name>
 
 ## Pruning
 
-`worktree prune` removes worktrees that are:
+`lfgwt prune` removes worktrees that are:
 
 - missing their directory,
 - older than 1 day, or
@@ -50,4 +50,4 @@ worktree remove|rm <branch_name>
 
 ## Shell integration
 
-Source `lfg.zsh` from your shell configuration to load the `lfg`, `worktree`, and `wt` commands plus their zsh completions.
+Source `lfg.zsh` from your shell configuration to load the `lfg` and `lfgwt` commands plus their zsh completions.
