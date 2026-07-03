@@ -162,6 +162,11 @@ function _worktree_cd() {
   _worktree_add "$branch"
 }
 
+function _worktree_fzf_color_flags() {
+  local color="${LFG_FZF_HIGHLIGHT_COLOR:-green}"
+  echo "--color=hl:${color},hl+:${color}"
+}
+
 function _worktree_pick_repo() {
   local repo
 
@@ -169,7 +174,7 @@ function _worktree_pick_repo() {
       -exec test -e '{}/.git' ';' -print 2>/dev/null \
     | sort \
     | fzf --prompt='repo> ' --height=40% --reverse \
-        --delimiter=/ --with-nth=-1)" || return 1
+        --delimiter=/ --with-nth=-1 $(_worktree_fzf_color_flags))" || return 1
 
   [ -n "$repo" ] || return 1
   echo "$repo"
@@ -180,7 +185,8 @@ function _worktree_pick_branch() {
 
   out="$(git worktree list --porcelain \
     | awk '/^branch / { sub("refs/heads/", "", $2); print $2 }' \
-    | fzf --print-query --prompt='lfgwt> ' --height=40% --reverse)"
+    | fzf --print-query --prompt='lfgwt> ' --height=40% --reverse \
+        $(_worktree_fzf_color_flags))"
   code=$?
 
   # 0 = picked existing, 1 = no match (create new); anything else = aborted.
