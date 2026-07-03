@@ -464,7 +464,7 @@ function _lfg_in_worktree() {
 function lfg() {
   local entrypoint branch repo
 
-  entrypoint="${1:-claude}"
+  entrypoint="${1:-${LFG_DEFAULT_AGENT_COMMAND:-claude}}"
   branch="$2"
 
   if ! command -v "$entrypoint" >/dev/null 2>&1; then
