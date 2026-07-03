@@ -80,4 +80,4 @@ Tab-completion is available for the agent entrypoints: `claude`, `claude-code`, 
 | `LFG_FZF_HIGHLIGHT_COLOR` | `green` | fzf highlight color. |
 | `LFG_SOURCE_DIR` | `~/src` | Directory scanned for repos outside a git repo. |
 | `LFG_INSTALL_DIR` | `~/.config/lfg` | Directory used by `install.sh`. |
-| `LFG_REPO_URL` | `https://github.com/llin/lfg.git` | Git URL cloned by `install.sh` when run remotely. |
+| `LFG_REPO_URL` | `https://github.com/leoxlin/lfg.git` | Git URL cloned by `install.sh` when run remotely. |

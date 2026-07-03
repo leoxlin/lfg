@@ -2,7 +2,7 @@
 set -euo pipefail
 
 LFG_INSTALL_DIR="${LFG_INSTALL_DIR:-$HOME/.config/lfg}"
-LFG_REPO_URL="${LFG_REPO_URL:-https://github.com/llin/lfg.git}"
+LFG_REPO_URL="${LFG_REPO_URL:-https://github.com/leoxlin/lfg.git}"
 ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
 BASHRC="${HOME}/.bashrc"
 FISH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fish"

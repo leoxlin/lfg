@@ -55,7 +55,7 @@ lfgwt remove|rm <branch_name>
 - `LFG_DEFAULT_AGENT_COMMAND` — agent launched by `lfg` when no entrypoint is given. Defaults to `claude`.
 - `LFG_FZF_HIGHLIGHT_COLOR` — highlight color passed to fzf. Defaults to `green`.
 - `LFG_INSTALL_DIR` — directory used by `install.sh`. Defaults to `~/.config/lfg`.
-- `LFG_REPO_URL` — git URL cloned by `install.sh` when run remotely. Defaults to `https://github.com/llin/lfg.git`.
+- `LFG_REPO_URL` — git URL cloned by `install.sh` when run remotely. Defaults to `https://github.com/leoxlin/lfg.git`.
 
 ## Shell support
 
