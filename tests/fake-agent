@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pwd_physical="$(pwd -P)"
+branch="$(git branch --show-current)"
+toplevel="$(git rev-parse --show-toplevel)"
+git_dir="$(git rev-parse --absolute-git-dir)"
+common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
+worktree_count="$(git worktree list --porcelain | awk '/^worktree / { count++ } END { print count + 0 }')"
+
+if [ "$git_dir" = "$common_dir" ]; then
+  is_worktree="false"
+else
+  is_worktree="true"
+fi
+
+printf 'pwd=%s\n' "$pwd_physical"
+printf 'branch=%s\n' "$branch"
+printf 'toplevel=%s\n' "$toplevel"
+printf 'git_dir=%s\n' "$git_dir"
+printf 'common_dir=%s\n' "$common_dir"
+printf 'is_worktree=%s\n' "$is_worktree"
+printf 'worktree_count=%s\n' "$worktree_count"
