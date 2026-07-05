@@ -44,6 +44,13 @@ INSTALL_SHELL=fish ./install.sh     # install for fish
 INSTALL_SHELL=oh-my-zsh ./install.sh # install as an Oh My Zsh plugin
 ```
 
+## Re-running the Installer
+
+The installer is idempotent. Before modifying any shell configuration, it runs
+the target shell and checks whether `lfg` is already available. If it is, the
+installer prints a message and does not modify your shell configuration files
+again. To force a fresh install, remove the existing installation first.
+
 ## Remote Install
 
 `install.sh` can be piped from a URL. It clones the repository into `~/.config/lfg/repo` and installs from there.

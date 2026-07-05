@@ -41,7 +41,7 @@ assert_file_contains() {
   local message="$3"
 
   assert_file_exists "$file" "$message"
-  if ! grep -Fxq "$expected" "$file"; then
+  if ! grep -Fq "$expected" "$file"; then
     fail "$message: expected $file to contain '$expected'"
   fi
 }
@@ -173,12 +173,82 @@ run_install_rejects_args_case() {
   echo "ok - install/rejects-${arg#--}"
 }
 
+run_install_idempotent_case() {
+  local method="$1"
+  local install_shell="$2"
+  local tmp="$tmp_root/install-idempotent-$method"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local first_output="$tmp/first.out"
+  local second_output="$tmp/second.out"
+  local config_file before
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home"
+
+  HOME="$home" \
+    ZDOTDIR="$zdotdir" \
+    XDG_CONFIG_HOME="$xdg_config_home" \
+    LFG_INSTALL_DIR="$install_dir" \
+    INSTALL_SHELL="$install_shell" \
+    bash "$ROOT/install.sh" > "$first_output" 2>&1
+
+  case "$method" in
+    zsh) config_file="$zdotdir/.zshrc" ;;
+    bash) config_file="$home/.bashrc" ;;
+    fish) config_file="" ;;
+    oh-my-zsh) config_file="" ;;
+    *) fail "install/idempotent-$method: unknown method" ;;
+  esac
+
+  before=""
+  if [ -n "$config_file" ]; then
+    before="$(cat "$config_file")"
+  fi
+
+  HOME="$home" \
+    ZDOTDIR="$zdotdir" \
+    XDG_CONFIG_HOME="$xdg_config_home" \
+    LFG_INSTALL_DIR="$install_dir" \
+    INSTALL_SHELL="$install_shell" \
+    bash "$ROOT/install.sh" > "$second_output" 2>&1
+
+  case "$method" in
+    zsh)
+      assert_file_contains "$config_file" "source \"$install_dir/lfg.zsh\"" "install/idempotent-$method zsh config"
+      assert_eq "$(cat "$config_file")" "$before" "install/idempotent-$method config unchanged"
+      assert_file_contains "$second_output" "already installed" "install/idempotent-$method already installed message"
+      ;;
+    bash)
+      assert_file_contains "$config_file" "source \"$install_dir/lfg.bash\"" "install/idempotent-$method bash config"
+      assert_eq "$(cat "$config_file")" "$before" "install/idempotent-$method config unchanged"
+      assert_file_contains "$second_output" "already installed" "install/idempotent-$method already installed message"
+      ;;
+    fish)
+      assert_file_exists "$xdg_config_home/fish/functions/lfg.fish" "install/idempotent-$method fish function"
+      assert_file_exists "$xdg_config_home/fish/completions/lfg.fish" "install/idempotent-$method fish completion"
+      ;;
+    oh-my-zsh)
+      assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.zsh" "install/idempotent-$method oh-my-zsh script"
+      assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.plugin.zsh" "install/idempotent-$method oh-my-zsh plugin"
+      ;;
+  esac
+
+  echo "ok - install/idempotent-$method"
+}
+
 run_install_cases() {
   local removed_arg
 
   run_install_auto_detect_case "current-shell-zsh" "" "/bin/zsh" "zsh"
   run_install_auto_detect_case "install-shell-fish" "/usr/bin/fish" "/bin/zsh" "fish"
   run_install_auto_detect_case "install-shell-oh-my-zsh" "oh-my-zsh" "/bin/zsh" "oh-my-zsh"
+
+  run_install_idempotent_case "zsh" "zsh"
+  run_install_idempotent_case "bash" "bash"
+  run_install_idempotent_case "fish" "fish"
+  run_install_idempotent_case "oh-my-zsh" "oh-my-zsh"
 
   for removed_arg in --zsh --bash --fish --oh-my-zsh; do
     run_install_rejects_args_case "$removed_arg"

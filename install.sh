@@ -78,18 +78,48 @@ add_line_to_file() {
   fi
 }
 
+shell_has_lfg() {
+  local shell_name="$1"
+  local shell_bin
+
+  shell_bin="$(command -v "$shell_name" 2>/dev/null)" || return 1
+
+  case "$shell_name" in
+    bash)
+      "$shell_bin" -i -c 'command -v lfg' >/dev/null 2>&1
+      ;;
+    zsh)
+      "$shell_bin" -i -c 'whence lfg' >/dev/null 2>&1
+      ;;
+    fish)
+      "$shell_bin" -i -c 'type lfg' >/dev/null 2>&1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 install_zsh() {
   echo "Installing lfg for zsh"
   mkdir -p "$LFG_INSTALL_DIR"
   ln -sf "$REPO_ROOT/lfg.zsh" "$LFG_INSTALL_DIR/lfg.zsh"
-  add_line_to_file "source \"$LFG_INSTALL_DIR/lfg.zsh\"" "$ZSHRC"
+  if shell_has_lfg zsh; then
+    echo "lfg is already installed for zsh; skipping .zshrc update"
+  else
+    add_line_to_file "source \"$LFG_INSTALL_DIR/lfg.zsh\"" "$ZSHRC"
+  fi
 }
 
 install_bash() {
   echo "Installing lfg for bash"
   mkdir -p "$LFG_INSTALL_DIR"
   ln -sf "$REPO_ROOT/lfg.bash" "$LFG_INSTALL_DIR/lfg.bash"
-  add_line_to_file "source \"$LFG_INSTALL_DIR/lfg.bash\"" "$BASHRC"
+  if shell_has_lfg bash; then
+    echo "lfg is already installed for bash; skipping .bashrc update"
+  else
+    add_line_to_file "source \"$LFG_INSTALL_DIR/lfg.bash\"" "$BASHRC"
+  fi
 }
 
 install_fish() {
@@ -107,7 +137,11 @@ install_oh_my_zsh() {
   cp -f "$REPO_ROOT/lfg.zsh" "$plugin_dir/lfg.zsh"
   cp -f "$REPO_ROOT/lfg.plugin.zsh" "$plugin_dir/lfg.plugin.zsh"
   echo "Plugin installed to $plugin_dir"
-  echo "Add 'lfg' to the plugins array in your .zshrc if it is not already there."
+  if shell_has_lfg zsh; then
+    echo "lfg is already installed for zsh"
+  else
+    echo "Add 'lfg' to the plugins array in your .zshrc if it is not already there."
+  fi
 }
 
 METHOD="auto"
