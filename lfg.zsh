@@ -10,7 +10,7 @@
 # - With no branch: pick an existing worktree branch, or type a new name to
 #   create one.
 # - Creates/switches the worktree (under $LFG_SOURCE_DIR/.agents/worktrees, via
-#   the lfgwt helper) and launches the entrypoint there. LFG_SOURCE_DIR
+#   the worktree helper) and launches the entrypoint there. LFG_SOURCE_DIR
 #   defaults to ~/src if unset.
 #
 # Worktree helper conventions:
@@ -29,13 +29,13 @@
 #   it is not already trusted. This prevents mise's chpwd hook from erroring.
 
 function _worktree_usage() {
-  echo "usage: lfgwt                         (interactive: pick branch/worktree; repo selection only when outside a repo)"
-  echo "       lfgwt add <branch_name>"
-  echo "       lfgwt cd <branch_name>"
-  echo "       lfgwt list"
-  echo "       lfgwt ls"
-  echo "       lfgwt prune"
-  echo "       lfgwt remove|rm <branch_name>"
+  echo "usage: worktree                         (interactive: pick branch/worktree; repo selection only when outside a repo)"
+  echo "       worktree add <branch_name>"
+  echo "       worktree cd <branch_name>"
+  echo "       worktree list"
+  echo "       worktree ls"
+  echo "       worktree prune"
+  echo "       worktree remove|rm <branch_name>"
   echo ""
   echo "cd creates the worktree if it does not already exist."
 }
@@ -154,7 +154,7 @@ function _worktree_cd() {
   local branch="$1"
 
   if [ -z "$branch" ]; then
-    echo "You must provide a branch for lfgwt" >&2
+    echo "You must provide a branch for worktree" >&2
     _worktree_usage >&2
     return 1
   fi
@@ -185,7 +185,7 @@ function _worktree_pick_branch() {
 
   out="$(git worktree list --porcelain \
     | awk '/^branch / { sub("refs/heads/", "", $2); print $2 }' \
-    | fzf --print-query --prompt='lfgwt> ' --height=40% --reverse \
+    | fzf --print-query --prompt='worktree> ' --height=40% --reverse \
         $(_worktree_fzf_color_flags))"
   code=$?
 
@@ -201,7 +201,7 @@ function _worktree_interactive_cd() {
   local repo branch
 
   if ! command -v fzf >/dev/null 2>&1; then
-    echo "lfgwt: fzf is required for interactive mode" >&2
+    echo "worktree: fzf is required for interactive mode" >&2
     return 1
   fi
 
@@ -258,7 +258,7 @@ function _worktree_add() {
 
   branch="$1"
   if [ -z "$branch" ]; then
-    echo "You must provide a branch for lfgwt" >&2
+    echo "You must provide a branch for worktree" >&2
     _worktree_usage >&2
     return 1
   fi
@@ -297,7 +297,7 @@ function _worktree_remove() {
 
   branch="$1"
   if [ -z "$branch" ]; then
-    echo "You must provide a branch for lfgwt" >&2
+    echo "You must provide a branch for worktree" >&2
     _worktree_usage >&2
     return 1
   fi
@@ -380,7 +380,7 @@ function _worktree_prune() {
   return "$failed"
 }
 
-function lfgwt() {
+function worktree() {
   local command
 
   if [ $# -gt 0 ]; then
@@ -413,11 +413,15 @@ function lfgwt() {
       _worktree_usage
       ;;
     *)
-      echo "unknown lfgwt command: $command" >&2
+      echo "unknown worktree command: $command" >&2
       _worktree_usage >&2
       return 1
       ;;
   esac
+}
+
+function wt() {
+  worktree "$@"
 }
 
 function _worktree_branches() {
@@ -436,7 +440,7 @@ function _worktree_complete() {
 
   case "$state" in
     command)
-      _values 'lfgwt command' \
+      _values 'worktree command' \
         'add[create or switch to a worktree]' \
         'cd[change to or create a worktree]' \
         'list[list worktrees]' \
@@ -456,7 +460,8 @@ function _worktree_complete() {
 }
 
 if (( $+functions[compdef] )); then
-  compdef _worktree_complete lfgwt
+  compdef _worktree_complete worktree
+  compdef _worktree_complete wt
 fi
 
 # True when the current directory is a linked worktree (not the main checkout).

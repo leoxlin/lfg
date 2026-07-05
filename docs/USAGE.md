@@ -18,37 +18,37 @@ Examples:
 - Outside a git repo, `lfg` asks you to pick one from `$LFG_SOURCE_DIR` with `fzf`.
 - With no branch, `lfg` asks you to pick an existing worktree branch or type a new branch name to create one.
 - If already inside a linked worktree and no branch is requested, `lfg` launches the agent in the current directory.
-- Otherwise, `lfg` creates or switches to the requested worktree through `lfgwt`, then launches the agent there.
+- Otherwise, `lfg` creates or switches to the requested worktree through `worktree`, then launches the agent there.
 - Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>` and reused by branch.
 - If `mise` is installed, entering a worktree auto-trusts its `mise` config when it is not already trusted. This prevents `mise`'s `chpwd` hook from erroring.
 
 ## Worktree Helper
 
-The `lfgwt` helper manages branch-specific worktrees.
+The `worktree` helper manages branch-specific worktrees. `wt` is an alias for `worktree`.
 
 ```text
-lfgwt                         # interactive: pick branch/worktree
-lfgwt add <branch_name>       # create or switch to a worktree
-lfgwt cd <branch_name>        # change to or create a worktree
-lfgwt list                    # list worktrees
-lfgwt ls                      # alias for list
-lfgwt prune                   # remove stale worktrees
-lfgwt remove|rm <branch_name> # remove a worktree
+worktree                         # interactive: pick branch/worktree
+worktree add <branch_name>       # create or switch to a worktree
+worktree cd <branch_name>        # change to or create a worktree
+worktree list                    # list worktrees
+worktree ls                      # alias for list
+worktree prune                   # remove stale worktrees
+worktree remove|rm <branch_name> # remove a worktree
 ```
 
 `cd` creates the worktree if it does not already exist.
 
 ## Worktree Conventions
 
-- All `lfgwt` commands must be run from inside a git repository and operate on that repo only.
+- All `worktree` commands must be run from inside a git repository and operate on that repo only.
 - Branch-related commands (`add`, `cd`, `remove`/`rm`) take a single `<branch_name>` argument.
 - Repo-wide commands (`list`, `ls`, `prune`) take no arguments.
 - Worktree paths replace `/` in branch names with `-`.
-- When creating a new branch, `lfgwt` starts from `origin/HEAD`, then falls back to `main`, `origin/main`, `master`, `origin/master`, and finally `HEAD`.
+- When creating a new branch, `worktree` starts from `origin/HEAD`, then falls back to `main`, `origin/main`, `master`, `origin/master`, and finally `HEAD`.
 
 ## Pruning
 
-`lfgwt prune` removes worktrees that are:
+`worktree prune` removes worktrees that are:
 
 - missing their directory,
 - older than `${LFG_PRUNE_OLDER_THAN_DAYS:-1}` day(s), or

@@ -103,4 +103,4 @@ For fish, copy `functions/` and `completions/` into `~/.config/fish/` and reload
 |-------|-------|------------|
 | zsh | `lfg.zsh` | zsh compsys (`compdef`) |
 | bash | `lfg.bash` | bash `complete -F` |
-| fish | `functions/lfg.fish`, `functions/lfgwt.fish` | `completions/lfg.fish`, `completions/lfgwt.fish` |
+| fish | `functions/lfg.fish`, `functions/worktree.fish` | `completions/lfg.fish`, `completions/worktree.fish` |

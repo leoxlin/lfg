@@ -1,21 +1,21 @@
-# lfgwt: worktree helper for lfg.
+# worktree: worktree helper for lfg.
 #
-# Usage: lfgwt                         (interactive: pick branch/worktree)
-#        lfgwt add <branch_name>
-#        lfgwt cd <branch_name>
-#        lfgwt list
-#        lfgwt ls
-#        lfgwt prune
-#        lfgwt remove|rm <branch_name>
+# Usage: worktree                         (interactive: pick branch/worktree)
+#        worktree add <branch_name>
+#        worktree cd <branch_name>
+#        worktree list
+#        worktree ls
+#        worktree prune
+#        worktree remove|rm <branch_name>
 
 function _worktree_usage
-    echo "usage: lfgwt                         (interactive: pick branch/worktree; repo selection only when outside a repo)"
-    echo "       lfgwt add <branch_name>"
-    echo "       lfgwt cd <branch_name>"
-    echo "       lfgwt list"
-    echo "       lfgwt ls"
-    echo "       lfgwt prune"
-    echo "       lfgwt remove|rm <branch_name>"
+    echo "usage: worktree                         (interactive: pick branch/worktree; repo selection only when outside a repo)"
+    echo "       worktree add <branch_name>"
+    echo "       worktree cd <branch_name>"
+    echo "       worktree list"
+    echo "       worktree ls"
+    echo "       worktree prune"
+    echo "       worktree remove|rm <branch_name>"
     echo ""
     echo "cd creates the worktree if it does not already exist."
 end
@@ -133,7 +133,7 @@ function _worktree_cd
     set -l branch $argv[1]
 
     if test -z "$branch"
-        echo "You must provide a branch for lfgwt" >&2
+        echo "You must provide a branch for worktree" >&2
         _worktree_usage >&2
         return 1
     end
@@ -160,7 +160,7 @@ end
 function _worktree_pick_branch
     set -l out (git worktree list --porcelain \
         | awk '/^branch / { sub("refs/heads/", "", $2); print $2 }' \
-        | fzf --print-query --prompt='lfgwt> ' --height=40% --reverse \
+        | fzf --print-query --prompt='worktree> ' --height=40% --reverse \
             (_worktree_fzf_color_flags))
     set -l code $status
 
@@ -178,7 +178,7 @@ end
 
 function _worktree_interactive_cd
     if not command -v fzf >/dev/null 2>&1
-        echo "lfgwt: fzf is required for interactive mode" >&2
+        echo "worktree: fzf is required for interactive mode" >&2
         return 1
     end
 
@@ -243,7 +243,7 @@ function _worktree_add
     set -l branch $argv[1]
 
     if test -z "$branch"
-        echo "You must provide a branch for lfgwt" >&2
+        echo "You must provide a branch for worktree" >&2
         _worktree_usage >&2
         return 1
     end
@@ -291,7 +291,7 @@ function _worktree_remove
     set -l branch $argv[1]
 
     if test -z "$branch"
-        echo "You must provide a branch for lfgwt" >&2
+        echo "You must provide a branch for worktree" >&2
         _worktree_usage >&2
         return 1
     end
@@ -406,7 +406,7 @@ function _worktree_prune
     return $failed
 end
 
-function lfgwt
+function worktree
     set -l command ""
     if set -q argv[1]
         set command $argv[1]
@@ -429,8 +429,12 @@ function lfgwt
         case help -h --help
             _worktree_usage
         case '*'
-            echo "unknown lfgwt command: $command" >&2
+            echo "unknown worktree command: $command" >&2
             _worktree_usage >&2
             return 1
     end
+end
+
+function wt --wraps worktree --description 'alias wt=worktree'
+    worktree $argv
 end

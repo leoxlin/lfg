@@ -10,12 +10,12 @@
 # - With no branch: pick an existing worktree branch, or type a new name to
 #   create one.
 # - Creates/switches the worktree (under $LFG_SOURCE_DIR/.agents/worktrees, via
-#   the lfgwt helper) and launches the entrypoint there. LFG_SOURCE_DIR
+#   the worktree helper) and launches the entrypoint there. LFG_SOURCE_DIR
 #   defaults to ~/src if unset.
 
-# Load the lfgwt helpers (also defines the lfgwt command).
+# Load the worktree helpers (also defines the worktree command).
 set -l __lfg_dir (status dirname)
-source "$__lfg_dir/lfgwt.fish"
+source "$__lfg_dir/worktree.fish"
 
 function _lfg_in_worktree
     set -l git_dir (git rev-parse --absolute-git-dir 2>/dev/null)
