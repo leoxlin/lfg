@@ -6,12 +6,22 @@
 curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
 ```
 
+The installer detects the shell to configure. When piping into `bash`, it first
+checks `INSTALL_SHELL`, then `$SHELL`, so users whose login shell is zsh or fish
+are not forced into the Bash install path.
+
+To pass the shell explicitly, set `INSTALL_SHELL`:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL="$SHELL" bash
+```
+
 For a specific shell:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash -s -- --zsh
-curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash -s -- --bash
-curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash -s -- --fish
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL=zsh bash
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL=bash bash
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL=fish bash
 ```
 
 ## Local Install
@@ -24,19 +34,26 @@ cd ~/.config/lfg-repo
 ./install.sh
 ```
 
-The installer auto-detects the current shell unless a method flag is passed:
+The installer auto-detects the current shell unless `INSTALL_SHELL` is set:
 
 ```bash
-./install.sh              # auto-detect
-./install.sh --zsh        # install for zsh
-./install.sh --bash       # install for bash
-./install.sh --fish       # install for fish
-./install.sh --oh-my-zsh  # install as an Oh My Zsh plugin
+./install.sh                        # auto-detect
+INSTALL_SHELL=zsh ./install.sh      # install for zsh
+INSTALL_SHELL=bash ./install.sh     # install for bash
+INSTALL_SHELL=fish ./install.sh     # install for fish
+INSTALL_SHELL=oh-my-zsh ./install.sh # install as an Oh My Zsh plugin
 ```
 
 ## Remote Install
 
 `install.sh` can be piped from a URL. It clones the repository into `~/.config/lfg/repo` and installs from there.
+
+Auto-detection order is:
+
+1. `INSTALL_SHELL` (`zsh`, `bash`, `fish`, `oh-my-zsh`, or a path ending in `zsh`, `bash`, or `fish`),
+2. `$SHELL`,
+3. the shell running `install.sh`,
+4. zsh as a final fallback.
 
 Override the repository URL with `LFG_REPO_URL` or `--repo-url`:
 

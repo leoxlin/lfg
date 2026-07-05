@@ -26,6 +26,26 @@ assert_eq() {
   fi
 }
 
+assert_file_exists() {
+  local file="$1"
+  local message="$2"
+
+  if [ ! -f "$file" ]; then
+    fail "$message: expected $file to exist"
+  fi
+}
+
+assert_file_contains() {
+  local file="$1"
+  local expected="$2"
+  local message="$3"
+
+  assert_file_exists "$file" "$message"
+  if ! grep -Fxq "$expected" "$file"; then
+    fail "$message: expected $file to contain '$expected'"
+  fi
+}
+
 field() {
   local name="$1"
   local file="$2"
@@ -83,6 +103,86 @@ setup_repo() {
   mkdir -p "$(dirname "$existing_worktree")"
   git -C "$repo" worktree add -b feat/existing "$existing_worktree" main >/dev/null 2>&1 || fail "creates existing branch worktree"
   git -C "$repo" worktree add -b feat/start "$start_worktree" main >/dev/null 2>&1 || fail "creates starting worktree"
+}
+
+run_install_auto_detect_case() {
+  local case_name="$1"
+  local install_shell="$2"
+  local shell_path="$3"
+  local expected_method="$4"
+  local tmp="$tmp_root/install-$case_name"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local output_file="$tmp/install.out"
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home"
+
+  if ! HOME="$home" \
+      ZDOTDIR="$zdotdir" \
+      XDG_CONFIG_HOME="$xdg_config_home" \
+      LFG_INSTALL_DIR="$install_dir" \
+      INSTALL_SHELL="$install_shell" \
+      SHELL="$shell_path" \
+      bash "$ROOT/install.sh" > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/$case_name failed"
+  fi
+
+  case "$expected_method" in
+    zsh)
+      assert_file_contains "$zdotdir/.zshrc" "source \"$install_dir/lfg.zsh\"" "install/$case_name zsh config"
+      ;;
+    bash)
+      assert_file_contains "$home/.bashrc" "source \"$install_dir/lfg.bash\"" "install/$case_name bash config"
+      ;;
+    fish)
+      assert_file_exists "$xdg_config_home/fish/functions/lfg.fish" "install/$case_name fish function"
+      assert_file_exists "$xdg_config_home/fish/completions/lfg.fish" "install/$case_name fish completion"
+      ;;
+    oh-my-zsh)
+      assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.zsh" "install/$case_name oh-my-zsh script"
+      assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.plugin.zsh" "install/$case_name oh-my-zsh plugin"
+      ;;
+    *)
+      fail "install/$case_name: unknown expected method"
+      ;;
+  esac
+
+  echo "ok - install/$case_name"
+}
+
+run_install_rejects_args_case() {
+  local arg="$1"
+  local tmp="$tmp_root/install-rejects-${arg#--}"
+  local output_file="$tmp/install.out"
+
+  mkdir -p "$tmp"
+
+  if bash "$ROOT/install.sh" "$arg" > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/rejects-${arg#--}: expected $arg to fail"
+  fi
+
+  if ! grep -Fq "Unknown option: $arg" "$output_file"; then
+    cat "$output_file" >&2 || true
+    fail "install/rejects-${arg#--}: expected unknown option error"
+  fi
+
+  echo "ok - install/rejects-${arg#--}"
+}
+
+run_install_cases() {
+  local removed_arg
+
+  run_install_auto_detect_case "current-shell-zsh" "" "/bin/zsh" "zsh"
+  run_install_auto_detect_case "install-shell-fish" "/usr/bin/fish" "/bin/zsh" "fish"
+  run_install_auto_detect_case "install-shell-oh-my-zsh" "oh-my-zsh" "/bin/zsh" "oh-my-zsh"
+
+  for removed_arg in --zsh --bash --fish --oh-my-zsh; do
+    run_install_rejects_args_case "$removed_arg"
+  done
 }
 
 shell_script_for() {
@@ -247,6 +347,8 @@ run_shell_cases() {
 }
 
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/lfg-tests.XXXXXX")"
+
+run_install_cases
 
 run_shell_cases "bash" "bash"
 run_shell_cases "zsh" "zsh"

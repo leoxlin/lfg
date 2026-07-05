@@ -15,10 +15,18 @@ Install with bash:
 curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
 ```
 
+When piping into Bash, pass your login shell explicitly if needed:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL="$SHELL" bash
+```
+
+To install for a specific shell, set `INSTALL_SHELL` to `zsh`, `bash`, `fish`, or `oh-my-zsh`.
+
 Then run:
 
 ```bash
-lfg [agent] [branch]
+lfg
 ```
 
 Examples:

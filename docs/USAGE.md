@@ -80,6 +80,7 @@ Configure `lfg` with environment variables.
 | `LFG_SOURCE_DIR` | `~/src` | Root directory scanned for repos when `lfg` is run outside a git repo. |
 | `LFG_INSTALL_DIR` | `~/.config/lfg` | Directory used by `install.sh`. Remote installs clone into `$LFG_INSTALL_DIR/repo`. |
 | `LFG_REPO_URL` | `https://github.com/leoxlin/lfg.git` | Git URL cloned by `install.sh` when run remotely. |
+| `INSTALL_SHELL` | unset | Shell selected by `install.sh` auto-detection. Accepts `zsh`, `bash`, `fish`, `oh-my-zsh`, or a path ending in `zsh`, `bash`, or `fish`. |
 
 Set a different default agent:
 
@@ -97,6 +98,18 @@ Keep worktrees longer before pruning:
 
 ```zsh
 export LFG_PRUNE_OLDER_THAN_DAYS=7
+```
+
+Install for the shell in `$SHELL` when piping the installer into Bash:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL="$SHELL" bash
+```
+
+Install for a specific shell:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL=fish bash
 ```
 
 ## Related Docs

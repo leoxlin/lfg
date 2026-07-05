@@ -17,20 +17,18 @@ Usage: install.sh [OPTIONS]
 Install lfg shell integration.
 
 Options:
-  --zsh           Install for zsh (source lfg.zsh in ~/.zshrc)
-  --bash          Install for bash (source lfg.bash in ~/.bashrc)
-  --fish          Install for fish (copy functions/completions)
-  --oh-my-zsh     Install as an Oh My Zsh plugin
   --install-dir   Override install directory (default: ~/.config/lfg)
   --repo-url      Override git repo URL for remote installs
                   (default: ${LFG_REPO_URL})
   -h, --help      Show this help message
 
-If no shell option is given, the current shell is auto-detected.
+The current shell is auto-detected.
+Set INSTALL_SHELL to zsh, bash, fish, oh-my-zsh, or a shell path to override detection.
 
 Remote install:
   curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | bash
-  curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | bash -s -- --fish
+  curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | INSTALL_SHELL="$SHELL" bash
+  curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | INSTALL_SHELL=fish bash
 
 The remote installer clones the repository into ~/.config/lfg/repo and
 installs from there. Override the URL with the LFG_REPO_URL environment
@@ -117,10 +115,6 @@ METHOD="auto"
 parse_args() {
   while [ $# -gt 0 ]; do
     case "$1" in
-      --zsh) METHOD="zsh" ;;
-      --bash) METHOD="bash" ;;
-      --fish) METHOD="fish" ;;
-      --oh-my-zsh) METHOD="oh-my-zsh" ;;
       --install-dir)
         LFG_INSTALL_DIR="$2"
         shift
@@ -144,7 +138,21 @@ parse_args() {
 }
 
 detect_shell() {
-  if [ -n "${ZSH_VERSION:-}" ]; then
+  local shell_name
+
+  if [ -n "${INSTALL_SHELL:-}" ]; then
+    if shell_name="$(install_method_from_value "$INSTALL_SHELL")"; then
+      echo "$shell_name"
+      return 0
+    fi
+
+    echo "error: INSTALL_SHELL must be zsh, bash, fish, oh-my-zsh, or a path ending in zsh, bash, or fish." >&2
+    exit 1
+  fi
+
+  if [ -n "${SHELL:-}" ] && shell_name="$(install_method_from_value "$SHELL")"; then
+    echo "$shell_name"
+  elif [ -n "${ZSH_VERSION:-}" ]; then
     echo "zsh"
   elif [ -n "${BASH_VERSION:-}" ]; then
     echo "bash"
@@ -154,6 +162,20 @@ detect_shell() {
     # Default to zsh for lack of better information.
     echo "zsh"
   fi
+}
+
+install_method_from_value() {
+  local value="$1"
+  local method="${value##*/}"
+
+  case "$method" in
+    zsh|bash|fish|oh-my-zsh)
+      echo "$method"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 main() {
