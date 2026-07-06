@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/leoxlin/lfg/compare/v0.3.0...v0.4.0) (2026-07-06)
+
+
+### Features
+
+* add file install logging to install.sh ([f9926fc](https://github.com/leoxlin/lfg/commit/f9926fce4dd8bc3ed4dd2732660461dddf998394))
+* **cmd:** improve --help ([fc8fa37](https://github.com/leoxlin/lfg/commit/fc8fa37a4e31e90bec4295eaa27ccbdd1a415758))
+* **installer:** better logging ([5afb0b6](https://github.com/leoxlin/lfg/commit/5afb0b626b23f7fa7211330accc6f4ebf96b4342))
+* **installer:** dependency install ([a5557d6](https://github.com/leoxlin/lfg/commit/a5557d64d6ff2a517dd5f18310a734c3a59b1e73))
+* **installer:** standardize on dash args ([07a25c1](https://github.com/leoxlin/lfg/commit/07a25c131d4e0ac2f849dc4762460c6f38ea3a5a))
+
+
+### Bug Fixes
+
+* **installer:** install all files ([2fb3d74](https://github.com/leoxlin/lfg/commit/2fb3d74e978d4812bf4899c384bfd553d73e8d89))
+
 ## [0.3.0](https://github.com/leoxlin/lfg/compare/v0.2.0...v0.3.0) (2026-07-06)
 
 
