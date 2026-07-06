@@ -24,7 +24,7 @@ Examples:
 - If already inside a linked worktree, `lfg` launches the agent in the current directory.
 - Otherwise, `lfg` creates or switches to the selected worktree through `worktree`, then launches the agent there.
 - `lfg --help` prints usage and exits without selecting a repo, entering a worktree, or launching an entrypoint.
-- `lfg --update` reruns the remote installer and downloads the latest GitHub release by default.
+- `lfg --update` downloads and installs the latest GitHub release by default.
 - Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>/<repo>` and reused by branch.
 - If a `lfg_worktree_setup` function exists, `lfg` calls it with the worktree path before entering a worktree.
 
@@ -102,9 +102,6 @@ Configure `lfg` with environment variables.
 | `LFG_FZF_POINTER_COLOR` | `bright-blue` | Color for the fzf selection pointer. Passed as `pointer:<color>`. |
 | `LFG_SOURCE_DIR` | `~/src` | Root directory scanned for repos when `lfg` is run outside a git repo. |
 | `LFG_COMPLETIONS_FILE` | bundled `completions/lfg.entrypoints` | Newline-delimited file of `lfg` entrypoint completion suggestions. Blank lines and lines starting with `#` are ignored. |
-| `LFG_INSTALL_DIR` | `~/.config/lfg` | Directory replaced by `install.sh` on every run. Remote installs stage release files in `$LFG_INSTALL_DIR/repo`. |
-| `LFG_RELEASE_VERSION` | `latest` | Release version installed by remote installs and `lfg --update`. Use values like `0.1.0`; tags with a leading `v` are also accepted. |
-| `INSTALL_SHELL` | unset | Shell selected by `install.sh` auto-detection. Accepts `zsh`, `bash`, `fish`, `oh-my-zsh`, or a path ending in `zsh`, `bash`, or `fish`. |
 
 Set a different default agent:
 
@@ -146,9 +143,8 @@ function lfg_worktree_setup
 end
 ```
 
-With the fish installer, define this in `~/.config/fish/config.fish`; fish
-autoloads `lfg` from `~/.config/fish/functions/`. For a manual fish install,
-define the hook before `source /path/to/lfg/functions/lfg.fish`.
+For fish, define this in `~/.config/fish/config.fish` or before sourcing
+`/path/to/lfg/functions/lfg.fish`.
 
 To keep the previous `mise trust` behavior, define the hook like this before
 sourcing `lfg`:
@@ -179,25 +175,6 @@ function lfg_worktree_setup
         mise trust -y -q -C "$worktree_path"
     end
 end
-```
-
-Install for the shell in `$SHELL` when piping the installer into Bash:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL="$SHELL" bash
-```
-
-Install for a specific shell:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL=fish bash
-```
-
-Install or update to a specific release:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | LFG_RELEASE_VERSION=0.1.0 bash
-LFG_RELEASE_VERSION=0.1.0 lfg --update
 ```
 
 ## Related Docs
