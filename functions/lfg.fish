@@ -41,11 +41,6 @@ function _lfg_update
         set install_dir "$LFG_INSTALL_DIR"
     end
 
-    set -l repo_url https://github.com/leoxlin/lfg.git
-    if set -q LFG_REPO_URL
-        set repo_url "$LFG_REPO_URL"
-    end
-
     set -l release_version latest
     if set -q LFG_RELEASE_VERSION
         set release_version "$LFG_RELEASE_VERSION"
@@ -67,7 +62,6 @@ function _lfg_update
     env \
         INSTALL_SHELL=fish \
         LFG_INSTALL_DIR="$install_dir" \
-        LFG_REPO_URL="$repo_url" \
         LFG_RELEASE_VERSION="$release_version" \
         bash "$install_script"
     set -l update_status $status

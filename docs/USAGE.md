@@ -82,7 +82,6 @@ Configure `lfg` with environment variables.
 | `LFG_FZF_HIGHLIGHT_COLOR` | `green` | Highlight color passed to `fzf`. |
 | `LFG_SOURCE_DIR` | `~/src` | Root directory scanned for repos when `lfg` is run outside a git repo. |
 | `LFG_INSTALL_DIR` | `~/.config/lfg` | Directory replaced by `install.sh` on every run. Remote installs stage release files in `$LFG_INSTALL_DIR/repo`. |
-| `LFG_REPO_URL` | `https://github.com/leoxlin/lfg.git` | GitHub repository used by remote installs and `lfg update`. |
 | `LFG_RELEASE_VERSION` | `latest` | Release version installed by remote installs and `lfg update`. Use values like `0.1.0`; tags with a leading `v` are also accepted. |
 | `INSTALL_SHELL` | unset | Shell selected by `install.sh` auto-detection. Accepts `zsh`, `bash`, `fish`, `oh-my-zsh`, or a path ending in `zsh`, `bash`, or `fish`. |
 

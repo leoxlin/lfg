@@ -20,4 +20,7 @@ Release bumps are based on Conventional Commits:
 - Breaking changes create a major release.
 
 When a GitHub release is created, the workflow runs `scripts/release.sh` with
-the released version and uploads `dist/lfg-<version>.zip` to the release.
+the released version and uploads `dist/lfg-<version>.zip` to that release. It
+also updates a `latest` tag/release and uploads `dist/lfg-latest.zip` there, so
+the remote installer can install the latest release without querying the GitHub
+API.

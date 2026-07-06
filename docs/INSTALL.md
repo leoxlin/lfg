@@ -63,10 +63,13 @@ your shell configuration files again.
 
 ## Remote Install
 
-`install.sh` can be piped from a URL. For GitHub repositories, it downloads the
-release archive into `~/.config/lfg`, stages the files in `~/.config/lfg/repo`,
-and installs from there. `LFG_RELEASE_VERSION` defaults to `latest`; set it to a
-release version such as `0.1.0` to install a specific release.
+`install.sh` can be piped from a URL. Remote installs download the release
+archive from `github.com/leoxlin/lfg` into `~/.config/lfg`, stage the files in
+`~/.config/lfg/repo`, and install from there. `LFG_RELEASE_VERSION` defaults to
+`latest`; set it to a release version such as `0.1.0` to install a specific
+release.
+
+Remote installs only support `github.com/leoxlin/lfg`.
 
 Auto-detection order is:
 
@@ -75,25 +78,12 @@ Auto-detection order is:
 3. the shell running `install.sh`,
 4. zsh as a final fallback.
 
-Override the repository URL with `LFG_REPO_URL` or `--repo-url`:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh \
-  | LFG_REPO_URL=https://github.com/leoxlin/lfg.git bash
-
-curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh \
-  | bash -s -- --repo-url https://github.com/leoxlin/lfg.git
-```
-
 Install a specific release:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh \
   | LFG_RELEASE_VERSION=0.1.0 bash
 ```
-
-For non-GitHub remote repositories, the installer falls back to `git clone`.
-`LFG_REPO_REF` or `--repo-ref` selects the branch or tag for that fallback path.
 
 ## Updating
 

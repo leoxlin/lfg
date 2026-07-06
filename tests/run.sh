@@ -117,11 +117,8 @@ done
 printf '%s\n' "$url" >> "$LFG_FAKE_CURL_LOG"
 
 case "$url" in
-  https://api.github.com/repos/leoxlin/lfg/releases/latest)
-    printf '{"tag_name":"v1.2.3"}\n'
-    ;;
-  https://github.com/leoxlin/lfg/releases/download/v1.2.3/lfg-1.2.3.zip)
-    cp "$LFG_RELEASE_ZIP_DIR/lfg-1.2.3.zip" "$output"
+  https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.zip)
+    cp "$LFG_RELEASE_ZIP_DIR/lfg-latest.zip" "$output"
     ;;
   https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.zip)
     cp "$LFG_RELEASE_ZIP_DIR/lfg-2.0.0.zip" "$output"
@@ -395,7 +392,7 @@ run_install_remote_release_case() {
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$zip_dir"
   write_fake_release_curl "$bin_dir"
 
-  LFG_DIST_DIR="$zip_dir" "$ROOT/scripts/release.sh" 1.2.3 >/dev/null
+  LFG_DIST_DIR="$zip_dir" "$ROOT/scripts/release.sh" latest >/dev/null
   LFG_DIST_DIR="$zip_dir" "$ROOT/scripts/release.sh" 2.0.0 >/dev/null
 
   env_args=(
@@ -440,10 +437,10 @@ run_install_cases() {
   run_install_replaces_install_dir_case "zsh" "zsh"
   run_install_replaces_install_dir_case "bash" "bash"
 
-  run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/v1.2.3/lfg-1.2.3.zip"
+  run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.zip"
   run_install_remote_release_case "specific" "v2.0.0" "https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.zip"
 
-  for removed_arg in --zsh --bash --fish --oh-my-zsh; do
+  for removed_arg in --zsh --bash --fish --oh-my-zsh --repo-url --repo-ref; do
     run_install_rejects_args_case "$removed_arg"
   done
 }
@@ -631,7 +628,6 @@ set -euo pipefail
 {
   printf 'install_shell=%s\n' "${INSTALL_SHELL:-}"
   printf 'install_dir=%s\n' "${LFG_INSTALL_DIR:-}"
-  printf 'repo_url=%s\n' "${LFG_REPO_URL:-}"
   printf 'release_version=%s\n' "${LFG_RELEASE_VERSION:-}"
 } > "$LFG_UPDATE_CAPTURE"
 EOF
@@ -641,7 +637,6 @@ EOF
 set -euo pipefail
 source "$ROOT/lfg.bash"
 export LFG_INSTALL_DIR="$tmp/install-dir"
-export LFG_REPO_URL="https://github.com/leoxlin/lfg.git"
 export LFG_RELEASE_VERSION="2.0.0"
 lfg update > "$output_file" 2> "$stderr_file"
 EOF
@@ -662,7 +657,6 @@ EOF
   assert_file_contains "$curl_log" "https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh" "lfg/update-bash downloaded installer"
   assert_eq "$(field install_shell "$capture")" "bash" "lfg/update-bash install shell"
   assert_eq "$(field install_dir "$capture")" "$tmp/install-dir" "lfg/update-bash install dir"
-  assert_eq "$(field repo_url "$capture")" "https://github.com/leoxlin/lfg.git" "lfg/update-bash repo url"
   assert_eq "$(field release_version "$capture")" "2.0.0" "lfg/update-bash release version"
 
   echo "ok - lfg/update-bash"

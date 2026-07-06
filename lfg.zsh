@@ -498,7 +498,7 @@ function _lfg_in_worktree() {
 }
 
 function _lfg_update() {
-  local install_url install_dir repo_url release_version install_script update_status
+  local install_url install_dir release_version install_script update_status
 
   if ! command -v curl >/dev/null 2>&1; then
     echo "lfg: curl is required to update" >&2
@@ -507,7 +507,6 @@ function _lfg_update() {
 
   install_url="https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh"
   install_dir="${LFG_INSTALL_DIR:-$HOME/.config/lfg}"
-  repo_url="${LFG_REPO_URL:-https://github.com/leoxlin/lfg.git}"
   release_version="${LFG_RELEASE_VERSION:-latest}"
 
   install_script="$(mktemp "${TMPDIR:-/tmp}/lfg-install.XXXXXX")" || return 1
@@ -518,7 +517,6 @@ function _lfg_update() {
 
   INSTALL_SHELL=zsh \
     LFG_INSTALL_DIR="$install_dir" \
-    LFG_REPO_URL="$repo_url" \
     LFG_RELEASE_VERSION="$release_version" \
     bash "$install_script"
   update_status=$?

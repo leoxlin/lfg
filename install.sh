@@ -2,8 +2,6 @@
 set -euo pipefail
 
 LFG_INSTALL_DIR="${LFG_INSTALL_DIR:-$HOME/.config/lfg}"
-LFG_REPO_URL="${LFG_REPO_URL:-https://github.com/leoxlin/lfg.git}"
-LFG_REPO_REF="${LFG_REPO_REF:-main}"
 LFG_RELEASE_VERSION="${LFG_RELEASE_VERSION:-latest}"
 ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
 BASHRC="${HOME}/.bashrc"
@@ -20,23 +18,18 @@ Install lfg shell integration.
 
 Options:
   --install-dir   Override install directory (default: ~/.config/lfg)
-  --repo-url      Override git repo URL for remote installs
-                  (default: ${LFG_REPO_URL})
-  --repo-ref      Override git ref for non-GitHub remote fallback installs
-                  (default: ${LFG_REPO_REF})
   -h, --help      Show this help message
 
 The current shell is auto-detected.
 Set INSTALL_SHELL to zsh, bash, fish, oh-my-zsh, or a shell path to override detection.
 
 Remote install:
-  curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | bash
-  curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | INSTALL_SHELL="$SHELL" bash
-  curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | INSTALL_SHELL=fish bash
+  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
+  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL=fish bash
 
 The remote installer downloads the latest GitHub release archive by default.
 Set LFG_RELEASE_VERSION to a release version such as 0.1.0 to install a
-specific release. Override the repository with LFG_REPO_URL or --repo-url.
+specific release. Remote installs only support github.com/leoxlin/lfg.
 EOF
 }
 
@@ -50,26 +43,6 @@ detect_source() {
   fi
 }
 
-# Convert a GitHub repo URL into owner/repo.
-# Supports https://github.com/owner/repo.git and git@github.com:owner/repo.git.
-github_repo_path() {
-  local url="$1"
-  local owner path repo
-
-  if [[ "$url" =~ ^https://github\.com/([^/]+)/(.+)$ ]]; then
-    owner="${BASH_REMATCH[1]}"
-    path="${BASH_REMATCH[2]}"
-  elif [[ "$url" =~ ^git@github\.com:([^/]+)/(.+)$ ]]; then
-    owner="${BASH_REMATCH[1]}"
-    path="${BASH_REMATCH[2]}"
-  else
-    return 1
-  fi
-
-  repo="${path%.git}"
-  echo "$owner/$repo"
-}
-
 # Download a single file when running remotely.
 download_file() {
   local url="$1"
@@ -81,28 +54,11 @@ download_file() {
   fi
 }
 
-latest_github_release_tag() {
-  local repo_path="$1"
-  local tag
-
-  tag="$(curl -fsSL "https://api.github.com/repos/$repo_path/releases/latest" \
-    | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
-    | head -n 1)"
-
-  if [ -z "$tag" ]; then
-    echo "error: failed to determine latest release for $repo_path" >&2
-    exit 1
-  fi
-
-  echo "$tag"
-}
-
 release_tag_for_version() {
-  local repo_path="$1"
-  local version="$2"
+  local version="$1"
 
   if [ "$version" = "latest" ]; then
-    latest_github_release_tag "$repo_path"
+    echo "latest"
   elif [[ "$version" == v* ]]; then
     echo "$version"
   else
@@ -155,33 +111,21 @@ fetch_repo() {
     return 0
   fi
 
-  if [ -z "$LFG_REPO_URL" ]; then
-    echo "error: LFG_REPO_URL is not set and install.sh is not running from a local clone." >&2
-    echo "Set LFG_REPO_URL to the git URL of the lfg repository." >&2
-    exit 1
-  fi
-
   local repo_dir="$LFG_INSTALL_DIR/repo"
   rm -rf "$repo_dir"
   mkdir -p "$repo_dir"
 
-  local repo_path
-  if repo_path="$(github_repo_path "$LFG_REPO_URL")"; then
-    local release_tag asset_version release_url zip_file extract_dir
+  local release_tag asset_version release_url zip_file extract_dir
 
-    release_tag="$(release_tag_for_version "$repo_path" "$LFG_RELEASE_VERSION")"
-    asset_version="${release_tag#v}"
-    release_url="https://github.com/$repo_path/releases/download/$release_tag/lfg-$asset_version.zip"
-    zip_file="$LFG_INSTALL_DIR/lfg-$asset_version.zip"
-    extract_dir="$LFG_INSTALL_DIR/release"
+  release_tag="$(release_tag_for_version "$LFG_RELEASE_VERSION")"
+  asset_version="${release_tag#v}"
+  release_url="https://github.com/leoxlin/lfg/releases/download/$release_tag/lfg-$asset_version.zip"
+  zip_file="$LFG_INSTALL_DIR/lfg-$asset_version.zip"
+  extract_dir="$LFG_INSTALL_DIR/release"
 
-    echo "Downloading $release_url"
-    download_file "$release_url" "$zip_file"
-    extract_release_zip "$zip_file" "$repo_dir" "$extract_dir"
-  else
-    echo "Cloning $LFG_REPO_URL"
-    git clone --depth 1 --branch "$LFG_REPO_REF" "$LFG_REPO_URL" "$repo_dir"
-  fi
+  echo "Downloading $release_url"
+  download_file "$release_url" "$zip_file"
+  extract_release_zip "$zip_file" "$repo_dir" "$extract_dir"
 
   REPO_ROOT="$repo_dir"
 }
@@ -273,14 +217,6 @@ parse_args() {
     case "$1" in
       --install-dir)
         LFG_INSTALL_DIR="$2"
-        shift
-        ;;
-      --repo-url)
-        LFG_REPO_URL="$2"
-        shift
-        ;;
-      --repo-ref)
-        LFG_REPO_REF="$2"
         shift
         ;;
       -h|--help)
