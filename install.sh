@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INSTALL_DIR="$HOME/.config/lfg"
+INSTALL_DIR="$HOME/.local/share/lfg"
 INSTALL_VERSION="latest"
 ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
 BASHRC="${HOME}/.bashrc"
@@ -29,7 +29,7 @@ Usage: install.sh [OPTIONS]
 Install lfg shell integration.
 
 Options:
-  --install-dir DIR      Override install directory (default: ~/.config/lfg)
+  --install-dir DIR      Override install directory (default: ~/.local/share/lfg)
   --install-shell SHELL  Shell to configure. Accepts zsh, bash, fish, oh-my-zsh,
                          or a shell path ending in zsh, bash, or fish. If unset,
                          install.sh checks \$SHELL, then the shell running

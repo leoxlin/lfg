@@ -37,7 +37,7 @@ The installer auto-detects your shell unless you pass `--install-shell`.
 
 ## Re-running the Installer
 
-Re-running the installer replaces `~/.config/lfg`, then updates shell config
+Re-running the installer replaces `~/.local/share/lfg`, then updates shell config
 only when `lfg` is not already available. Each run prints files as it installs
 them.
 
@@ -47,7 +47,7 @@ infer your source directory.
 ## Remote Install
 
 `install.sh` can be piped from a URL. Remote installs download the release
-archive from `github.com/leoxlin/lfg` into `~/.config/lfg`.
+archive from `github.com/leoxlin/lfg` into `~/.local/share/lfg`.
 
 Remote installs only support `github.com/leoxlin/lfg`.
 

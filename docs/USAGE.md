@@ -127,7 +127,7 @@ function lfg_worktree_setup() {
   :
 }
 
-source "$HOME/.config/lfg/lfg.zsh" # or lfg.bash
+source "$HOME/.local/share/lfg/lfg.zsh" # or lfg.bash
 ```
 
 No-op hook for fish:
