@@ -64,8 +64,13 @@ Tab completion is available for `update` and the agent entrypoints:
 
 - `update`
 - `claude`
-- `claude-code`
+- `antigravity`
 - `codex`
+- `cursor`
+- `kimi`
+- `kimi-code`
+- `opencode`
+- `pi`
 - `aider`
 - `gemini`
 

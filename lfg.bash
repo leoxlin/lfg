@@ -553,7 +553,7 @@ function _lfg_completion() {
 
   case "$COMP_CWORD" in
     1)
-      COMPREPLY=( $(compgen -W "update claude claude-code codex aider gemini" -- "$cur") )
+      COMPREPLY=( $(compgen -W "update claude antigravity codex cursor kimi kimi-code opencode pi aider gemini" -- "$cur") )
       ;;
     2)
       branches="$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)"

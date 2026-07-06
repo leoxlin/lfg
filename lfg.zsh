@@ -563,7 +563,18 @@ function lfg() {
 
 function _lfg_complete() {
   case "$CURRENT" in
-    2) _values 'entrypoint' 'update' 'claude' 'claude-code' 'codex' 'aider' 'gemini' ;;
+    2) _values 'entrypoint' \
+      'update' \
+      'claude' \
+      'antigravity' \
+      'codex' \
+      'cursor' \
+      'kimi' \
+      'kimi-code' \
+      'opencode' \
+      'pi' \
+      'aider' \
+      'gemini' ;;
     3) _worktree_branches ;;
   esac
 }
