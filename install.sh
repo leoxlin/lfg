@@ -109,13 +109,32 @@ detect_source() {
 release_tag_for_version() {
   local version="$1"
 
-  if [ "$version" = "latest" ]; then
-    echo "latest"
-  elif [[ "$version" == v* ]]; then
+  if [[ "$version" == v* ]]; then
     echo "$version"
   else
     echo "v$version"
   fi
+}
+
+# Resolve the "latest" version to an actual release tag name via the GitHub API.
+# Prints the version without a leading v (e.g. "0.4.0").
+resolve_latest_version() {
+  local api_url="https://api.github.com/repos/leoxlin/lfg/releases/latest"
+  local tag_name
+
+  logger "INFO" "Resolving latest release from GitHub"
+  if ! tag_name="$(curl -fsSL "$api_url" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"; then
+    logger "ERROR" "Failed to fetch latest release information from GitHub"
+    exit 1
+  fi
+
+  if [ -z "$tag_name" ]; then
+    logger "ERROR" "Could not determine latest release tag from GitHub response"
+    exit 1
+  fi
+
+  logger "INFO" "Latest release tag: $tag_name"
+  echo "${tag_name#v}"
 }
 
 # Download a single file when running remotely.
@@ -193,9 +212,14 @@ install_release_tree() {
     return 0
   fi
 
-  local release_tag asset_version release_url archive_file extract_dir
+  local requested_version release_tag asset_version release_url archive_file extract_dir
 
-  release_tag="$(release_tag_for_version "$INSTALL_VERSION")"
+  requested_version="$INSTALL_VERSION"
+  if [ "$requested_version" = "latest" ]; then
+    requested_version="$(resolve_latest_version)"
+  fi
+
+  release_tag="$(release_tag_for_version "$requested_version")"
   asset_version="${release_tag#v}"
   release_url="https://github.com/leoxlin/lfg/releases/download/$release_tag/lfg-$asset_version.tar.gz"
   archive_file="$INSTALL_DIR/lfg-$asset_version.tar.gz"
