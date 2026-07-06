@@ -66,30 +66,19 @@ release_tag_for_version() {
   fi
 }
 
-extract_release_zip() {
-  local zip_file="$1"
+extract_release_archive() {
+  local archive_file="$1"
   local dest_dir="$2"
   local extract_dir="$3"
 
   mkdir -p "$extract_dir" "$dest_dir"
 
-  if command -v python3 >/dev/null 2>&1; then
-    python3 - "$zip_file" "$extract_dir" <<'PY'
-import sys
-import zipfile
-
-zip_file, extract_dir = sys.argv[1:]
-with zipfile.ZipFile(zip_file) as archive:
-    archive.extractall(extract_dir)
-PY
-  elif command -v unzip >/dev/null 2>&1; then
-    unzip -q "$zip_file" -d "$extract_dir"
-  elif command -v bsdtar >/dev/null 2>&1; then
-    bsdtar -xf "$zip_file" -C "$extract_dir"
-  else
-    echo "error: release install requires python3, unzip, or bsdtar" >&2
+  if ! command -v tar >/dev/null 2>&1; then
+    echo "error: release install requires tar" >&2
     exit 1
   fi
+
+  tar -xzf "$archive_file" -C "$extract_dir"
 
   local source_dir
   source_dir="$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d | sort | sed -n '1p')"
@@ -115,17 +104,17 @@ fetch_repo() {
   rm -rf "$repo_dir"
   mkdir -p "$repo_dir"
 
-  local release_tag asset_version release_url zip_file extract_dir
+  local release_tag asset_version release_url archive_file extract_dir
 
   release_tag="$(release_tag_for_version "$LFG_RELEASE_VERSION")"
   asset_version="${release_tag#v}"
-  release_url="https://github.com/leoxlin/lfg/releases/download/$release_tag/lfg-$asset_version.zip"
-  zip_file="$LFG_INSTALL_DIR/lfg-$asset_version.zip"
+  release_url="https://github.com/leoxlin/lfg/releases/download/$release_tag/lfg-$asset_version.tar.gz"
+  archive_file="$LFG_INSTALL_DIR/lfg-$asset_version.tar.gz"
   extract_dir="$LFG_INSTALL_DIR/release"
 
   echo "Downloading $release_url"
-  download_file "$release_url" "$zip_file"
-  extract_release_zip "$zip_file" "$repo_dir" "$extract_dir"
+  download_file "$release_url" "$archive_file"
+  extract_release_archive "$archive_file" "$repo_dir" "$extract_dir"
 
   REPO_ROOT="$repo_dir"
 }

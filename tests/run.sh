@@ -93,7 +93,7 @@ write_fake_release_curl() {
 set -euo pipefail
 
 : "${LFG_FAKE_CURL_LOG:?LFG_FAKE_CURL_LOG must be set}"
-: "${LFG_RELEASE_ZIP_DIR:?LFG_RELEASE_ZIP_DIR must be set}"
+: "${LFG_RELEASE_ARCHIVE_DIR:?LFG_RELEASE_ARCHIVE_DIR must be set}"
 
 output=""
 url=""
@@ -117,11 +117,11 @@ done
 printf '%s\n' "$url" >> "$LFG_FAKE_CURL_LOG"
 
 case "$url" in
-  https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.zip)
-    cp "$LFG_RELEASE_ZIP_DIR/lfg-latest.zip" "$output"
+  https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.tar.gz)
+    cp "$LFG_RELEASE_ARCHIVE_DIR/lfg-latest.tar.gz" "$output"
     ;;
-  https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.zip)
-    cp "$LFG_RELEASE_ZIP_DIR/lfg-2.0.0.zip" "$output"
+  https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.tar.gz)
+    cp "$LFG_RELEASE_ARCHIVE_DIR/lfg-2.0.0.tar.gz" "$output"
     ;;
   *)
     echo "fake curl: unexpected URL: $url" >&2
@@ -384,16 +384,16 @@ run_install_remote_release_case() {
   local xdg_config_home="$tmp/xdg"
   local install_dir="$tmp/lfg"
   local bin_dir="$tmp/bin"
-  local zip_dir="$tmp/zips"
+  local archive_dir="$tmp/archives"
   local curl_log="$tmp/curl.log"
   local output_file="$tmp/install.out"
   local -a env_args
 
-  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$zip_dir"
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$archive_dir"
   write_fake_release_curl "$bin_dir"
 
-  LFG_DIST_DIR="$zip_dir" "$ROOT/scripts/release.sh" latest >/dev/null
-  LFG_DIST_DIR="$zip_dir" "$ROOT/scripts/release.sh" 2.0.0 >/dev/null
+  LFG_DIST_DIR="$archive_dir" "$ROOT/scripts/release.sh" latest >/dev/null
+  LFG_DIST_DIR="$archive_dir" "$ROOT/scripts/release.sh" 2.0.0 >/dev/null
 
   env_args=(
     "HOME=$home"
@@ -404,7 +404,7 @@ run_install_remote_release_case() {
     "SHELL=/bin/zsh"
     "PATH=$bin_dir:$PATH"
     "LFG_FAKE_CURL_LOG=$curl_log"
-    "LFG_RELEASE_ZIP_DIR=$zip_dir"
+    "LFG_RELEASE_ARCHIVE_DIR=$archive_dir"
   )
 
   if [ -n "$release_version" ]; then
@@ -437,8 +437,8 @@ run_install_cases() {
   run_install_replaces_install_dir_case "zsh" "zsh"
   run_install_replaces_install_dir_case "bash" "bash"
 
-  run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.zip"
-  run_install_remote_release_case "specific" "v2.0.0" "https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.zip"
+  run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.tar.gz"
+  run_install_remote_release_case "specific" "v2.0.0" "https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.tar.gz"
 
   for removed_arg in --zsh --bash --fish --oh-my-zsh --repo-url --repo-ref; do
     run_install_rejects_args_case "$removed_arg"

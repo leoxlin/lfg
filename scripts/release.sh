@@ -7,7 +7,7 @@ usage() {
   cat <<EOF
 Usage: scripts/release.sh [version]
 
-Create a release zip containing the installable lfg files.
+Create a release tarball containing the installable lfg files.
 
 Options:
   -h, --help  Show this help message
@@ -43,7 +43,7 @@ mkdir -p "$dist_dir"
 dist_dir="$(cd "$dist_dir" && pwd)"
 
 release_name="lfg-$version"
-zip_file="$dist_dir/$release_name.zip"
+archive_file="$dist_dir/$release_name.tar.gz"
 
 release_patterns=(
   'lfg.*'
@@ -81,38 +81,13 @@ for file in "${release_files[@]}"; do
   cp -p "$ROOT/$file" "$stage_dir/$file"
 done
 
-rm -f "$zip_file"
+rm -f "$archive_file"
 
-if command -v python3 >/dev/null 2>&1; then
-  python3 - "$tmp_dir" "$release_name" "$zip_file" <<'PY'
-import os
-import stat
-import sys
-import zipfile
-
-tmp_dir, release_name, zip_file = sys.argv[1:]
-root = os.path.join(tmp_dir, release_name)
-
-with zipfile.ZipFile(zip_file, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames.sort()
-        filenames.sort()
-        for filename in filenames:
-            path = os.path.join(dirpath, filename)
-            relpath = os.path.relpath(path, tmp_dir)
-            info = zipfile.ZipInfo.from_file(path, relpath)
-            mode = stat.S_IMODE(os.stat(path).st_mode)
-            info.external_attr = mode << 16
-            with open(path, "rb") as handle:
-                archive.writestr(info, handle.read(), compress_type=zipfile.ZIP_DEFLATED)
-PY
-elif command -v zip >/dev/null 2>&1; then
-  (cd "$tmp_dir" && zip -X -r "$zip_file" "$release_name" >/dev/null)
-elif command -v bsdtar >/dev/null 2>&1; then
-  (cd "$tmp_dir" && bsdtar -a -cf "$zip_file" "$release_name")
+if command -v tar >/dev/null 2>&1; then
+  (cd "$tmp_dir" && tar -czf "$archive_file" "$release_name")
 else
-  echo "error: release build requires python3, zip, or bsdtar" >&2
+  echo "error: release build requires tar" >&2
   exit 1
 fi
 
-echo "Created $zip_file"
+echo "Created $archive_file"
