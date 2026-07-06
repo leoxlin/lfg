@@ -22,7 +22,7 @@ function _lfg_update
 
     set -l install_url https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh
 
-    set -l install_dir "$HOME/.config/lfg"
+    set -l install_dir "$__lfg_dir"
 
     set -l tmpdir /tmp
     if set -q TMPDIR
