@@ -10,6 +10,15 @@ FISH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fish"
 
 REPO_ROOT=""
 IS_LOCAL=false
+REPO_FILES=(
+  lfg.zsh
+  lfg.bash
+  lfg.plugin.zsh
+  functions/lfg.fish
+  functions/worktree.fish
+  completions/lfg.fish
+  completions/worktree.fish
+)
 
 usage() {
   cat <<EOF
@@ -106,13 +115,11 @@ fetch_repo() {
   local raw_base
   if raw_base="$(github_raw_base "$LFG_REPO_URL" "$LFG_REPO_REF")"; then
     echo "Downloading files from $raw_base"
-    download_file "$raw_base/lfg.zsh" "$repo_dir/lfg.zsh"
-    download_file "$raw_base/lfg.bash" "$repo_dir/lfg.bash"
-    download_file "$raw_base/lfg.plugin.zsh" "$repo_dir/lfg.plugin.zsh"
-    download_file "$raw_base/functions/lfg.fish" "$repo_dir/functions/lfg.fish"
-    download_file "$raw_base/functions/worktree.fish" "$repo_dir/functions/worktree.fish"
-    download_file "$raw_base/completions/lfg.fish" "$repo_dir/completions/lfg.fish"
-    download_file "$raw_base/completions/worktree.fish" "$repo_dir/completions/worktree.fish"
+    local file
+    for file in "${REPO_FILES[@]}"; do
+      mkdir -p "$repo_dir/$(dirname "$file")"
+      download_file "$raw_base/$file" "$repo_dir/$file"
+    done
   else
     echo "Cloning $LFG_REPO_URL"
     git clone --depth 1 "$LFG_REPO_URL" "$repo_dir"
@@ -157,24 +164,25 @@ shell_has_lfg() {
 }
 
 install_zsh() {
-  echo "Installing lfg for zsh"
-  mkdir -p "$LFG_INSTALL_DIR"
-  cp -f "$REPO_ROOT/lfg.zsh" "$LFG_INSTALL_DIR/lfg.zsh"
-  if shell_has_lfg zsh; then
-    echo "lfg is already installed for zsh; skipping .zshrc update"
-  else
-    add_line_to_file "source \"$LFG_INSTALL_DIR/lfg.zsh\"" "$ZSHRC"
-  fi
+  install_source_shell zsh lfg.zsh "$ZSHRC"
 }
 
 install_bash() {
-  echo "Installing lfg for bash"
+  install_source_shell bash lfg.bash "$BASHRC"
+}
+
+install_source_shell() {
+  local shell_name="$1"
+  local script_name="$2"
+  local config_file="$3"
+
+  echo "Installing lfg for $shell_name"
   mkdir -p "$LFG_INSTALL_DIR"
-  cp -f "$REPO_ROOT/lfg.bash" "$LFG_INSTALL_DIR/lfg.bash"
-  if shell_has_lfg bash; then
-    echo "lfg is already installed for bash; skipping .bashrc update"
+  cp -f "$REPO_ROOT/$script_name" "$LFG_INSTALL_DIR/$script_name"
+  if shell_has_lfg "$shell_name"; then
+    echo "lfg is already installed for $shell_name; skipping ${config_file##*/} update"
   else
-    add_line_to_file "source \"$LFG_INSTALL_DIR/lfg.bash\"" "$BASHRC"
+    add_line_to_file "source \"$LFG_INSTALL_DIR/$script_name\"" "$config_file"
   fi
 }
 

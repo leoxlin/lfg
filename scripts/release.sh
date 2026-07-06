@@ -63,26 +63,20 @@ mkdir -p "$stage_dir"
 release_files=()
 shopt -s nullglob
 for pattern in "${release_patterns[@]}"; do
-  matched=false
-  for path in "$ROOT"/$pattern; do
-    [ -f "$path" ] || continue
-    release_files+=("${path#$ROOT/}")
-    matched=true
-  done
-
-  if [ "$matched" = false ]; then
+  matches=("$ROOT"/$pattern)
+  if [ "${#matches[@]}" -eq 0 ]; then
     echo "error: release pattern matched no files: $pattern" >&2
     exit 1
   fi
+
+  for path in "${matches[@]}"; do
+    [ -f "$path" ] || continue
+    release_files+=("${path#$ROOT/}")
+  done
 done
 shopt -u nullglob
 
 for file in "${release_files[@]}"; do
-  if [ ! -f "$ROOT/$file" ]; then
-    echo "error: release file not found: $file" >&2
-    exit 1
-  fi
-
   mkdir -p "$stage_dir/$(dirname "$file")"
   cp -p "$ROOT/$file" "$stage_dir/$file"
 done

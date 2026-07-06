@@ -132,13 +132,28 @@ end
 function _worktree_cd
     set -l branch $argv[1]
 
-    if test -z "$branch"
-        echo "You must provide a branch for worktree" >&2
-        _worktree_usage >&2
-        return 1
-    end
+    _worktree_require_branch "$branch"
+    or return 1
 
     _worktree_add "$branch"
+end
+
+function _worktree_require_branch
+    if test -n "$argv[1]"
+        return 0
+    end
+
+    echo "You must provide a branch for worktree" >&2
+    _worktree_usage >&2
+    return 1
+end
+
+function _worktree_enter
+    set -l worktree_path $argv[1]
+
+    _worktree_mise_trust_if_untrusted "$worktree_path"
+    cd "$worktree_path"
+    or return 1
 end
 
 function _worktree_fzf_color_flags
@@ -242,11 +257,8 @@ end
 function _worktree_add
     set -l branch $argv[1]
 
-    if test -z "$branch"
-        echo "You must provide a branch for worktree" >&2
-        _worktree_usage >&2
-        return 1
-    end
+    _worktree_require_branch "$branch"
+    or return 1
 
     _worktree_require_git_repo
     or return 1
@@ -254,10 +266,8 @@ function _worktree_add
     set -l worktree_path (_worktree_path_for_branch "$branch")
     or return 1
     if test -n "$worktree_path"
-        _worktree_mise_trust_if_untrusted "$worktree_path"
-        cd "$worktree_path"
-        or return 1
-        return 0
+        _worktree_enter "$worktree_path"
+        return
     end
 
     set worktree_path (_worktree_new_path "$branch")
@@ -282,19 +292,14 @@ function _worktree_add
         return 1
     end
 
-    _worktree_mise_trust_if_untrusted "$worktree_path"
-    cd "$worktree_path"
-    or return 1
+    _worktree_enter "$worktree_path"
 end
 
 function _worktree_remove
     set -l branch $argv[1]
 
-    if test -z "$branch"
-        echo "You must provide a branch for worktree" >&2
-        _worktree_usage >&2
-        return 1
-    end
+    _worktree_require_branch "$branch"
+    or return 1
 
     _worktree_require_git_repo
     or return 1
@@ -321,6 +326,43 @@ function _worktree_prune_days
     end
 end
 
+function _worktree_prune_reason
+    set -l worktree_path $argv[1]
+    set -l branch_name $argv[2]
+    set -l days (_worktree_prune_days)
+
+    if test ! -d "$worktree_path"
+        echo "missing directory"
+    else if _worktree_is_older_than_days "$worktree_path" "$days"
+        echo "older than $days day(s)"
+    else if not _worktree_branch_has_remote "$branch_name"
+        echo "no remote branch"
+    else
+        return 1
+    end
+end
+
+function _worktree_prune_record
+    set -l parent $argv[1]
+    set -l worktree_path $argv[2]
+    set -l branch_ref $argv[3]
+
+    if test -z "$worktree_path"; or test "$worktree_path" = "$parent"
+        return 2
+    end
+
+    set -l branch_name (_worktree_branch_name "$branch_ref")
+    set -l reason (_worktree_prune_reason "$worktree_path" "$branch_name")
+    or return 2
+
+    printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
+    if test ! -d "$worktree_path"
+        return 0
+    end
+
+    git -C "$parent" worktree remove "$worktree_path"
+end
+
 function _worktree_prune
     _worktree_require_git_repo
     or return 1
@@ -336,30 +378,14 @@ function _worktree_prune
     set -l lines (git -C "$parent" worktree list --porcelain | string split \n)
     for line in $lines
         if test -z "$line"
-            if test -n "$worktree_path"; and test "$worktree_path" != "$parent"
-                set -l branch_name (_worktree_branch_name "$branch_ref")
-                set -l reason ""
-                if test ! -d "$worktree_path"
-                    set reason "missing directory"
-                else if _worktree_is_older_than_days "$worktree_path" (_worktree_prune_days)
-                    set reason "older than "(_worktree_prune_days)" day(s)"
-                else if not _worktree_branch_has_remote "$branch_name"
-                    set reason "no remote branch"
-                else
-                    set worktree_path ""
-                    set branch_ref ""
-                    continue
-                end
-
-                printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
-                if test ! -d "$worktree_path"
-                    set removed 1
-                else if git -C "$parent" worktree remove "$worktree_path"
-                    set removed 1
-                else
-                    set failed 1
-                end
+            _worktree_prune_record "$parent" "$worktree_path" "$branch_ref"
+            set -l prune_status $status
+            if test $prune_status -eq 0
+                set removed 1
+            else if test $prune_status -ne 2
+                set failed 1
             end
+
             set worktree_path ""
             set branch_ref ""
         else if string match -q 'worktree *' -- "$line"
@@ -370,30 +396,12 @@ function _worktree_prune
     end
 
     # Process the final record if there was no trailing blank line.
-    if test -n "$worktree_path"; and test "$worktree_path" != "$parent"
-        set -l branch_name (_worktree_branch_name "$branch_ref")
-        set -l reason ""
-        if test ! -d "$worktree_path"
-            set reason "missing directory"
-        else if _worktree_is_older_than_days "$worktree_path" (_worktree_prune_days)
-            set reason "older than "(_worktree_prune_days)" day(s)"
-        else if not _worktree_branch_has_remote "$branch_name"
-            set reason "no remote branch"
-        else
-            set worktree_path ""
-            set branch_ref ""
-        end
-
-        if test -n "$reason"
-            printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
-            if test ! -d "$worktree_path"
-                set removed 1
-            else if git -C "$parent" worktree remove "$worktree_path"
-                set removed 1
-            else
-                set failed 1
-            end
-        end
+    _worktree_prune_record "$parent" "$worktree_path" "$branch_ref"
+    set -l prune_status $status
+    if test $prune_status -eq 0
+        set removed 1
+    else if test $prune_status -ne 2
+        set failed 1
     end
 
     git -C "$parent" worktree prune

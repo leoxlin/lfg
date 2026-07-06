@@ -140,6 +140,44 @@ function _worktree_is_older_than_days() {
   [ -n "$(find "$worktree_path" -prune -mtime +"$days" -print 2>/dev/null)" ]
 }
 
+function _worktree_prune_days() {
+  echo "${LFG_PRUNE_OLDER_THAN_DAYS:-1}"
+}
+
+function _worktree_prune_reason() {
+  local worktree_path="$1"
+  local branch_name="$2"
+  local days="$(_worktree_prune_days)"
+
+  if [ ! -d "$worktree_path" ]; then
+    echo "missing directory"
+  elif _worktree_is_older_than_days "$worktree_path" "$days"; then
+    echo "older than $days day(s)"
+  elif ! _worktree_branch_has_remote "$branch_name"; then
+    echo "no remote branch"
+  else
+    return 1
+  fi
+}
+
+function _worktree_prune_record() {
+  local parent="$1"
+  local worktree_path="$2"
+  local branch_ref="$3"
+  local branch_name reason
+
+  [ -n "$worktree_path" ] || return 2
+  [ "$worktree_path" != "$parent" ] || return 2
+
+  branch_name="$(_worktree_branch_name "$branch_ref")"
+  reason="$(_worktree_prune_reason "$worktree_path" "$branch_name")" || return 2
+
+  printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
+  [ -d "$worktree_path" ] || return 0
+
+  git -C "$parent" worktree remove "$worktree_path"
+}
+
 function _worktree_mise_trust_if_untrusted() {
   local worktree_path="$1"
 
@@ -153,13 +191,26 @@ function _worktree_mise_trust_if_untrusted() {
 function _worktree_cd() {
   local branch="$1"
 
-  if [ -z "$branch" ]; then
-    echo "You must provide a branch for worktree" >&2
-    _worktree_usage >&2
-    return 1
-  fi
+  _worktree_require_branch "$branch" || return 1
 
   _worktree_add "$branch"
+}
+
+function _worktree_require_branch() {
+  if [ -n "$1" ]; then
+    return 0
+  fi
+
+  echo "You must provide a branch for worktree" >&2
+  _worktree_usage >&2
+  return 1
+}
+
+function _worktree_enter() {
+  local worktree_path="$1"
+
+  _worktree_mise_trust_if_untrusted "$worktree_path"
+  cd "$worktree_path" || return 1
 }
 
 function _worktree_fzf_color_flags() {
@@ -257,19 +308,14 @@ function _worktree_add() {
   local branch worktree_path default_ref
 
   branch="$1"
-  if [ -z "$branch" ]; then
-    echo "You must provide a branch for worktree" >&2
-    _worktree_usage >&2
-    return 1
-  fi
+  _worktree_require_branch "$branch" || return 1
 
   _worktree_require_git_repo || return 1
 
   worktree_path="$(_worktree_path_for_branch "$branch")" || return 1
   if [ -n "$worktree_path" ]; then
-    _worktree_mise_trust_if_untrusted "$worktree_path"
-    cd "$worktree_path" || return 1
-    return 0
+    _worktree_enter "$worktree_path"
+    return
   fi
 
   worktree_path="$(_worktree_new_path "$branch")" || return 1
@@ -288,19 +334,14 @@ function _worktree_add() {
     return 1
   fi
 
-  _worktree_mise_trust_if_untrusted "$worktree_path"
-  cd "$worktree_path" || return 1
+  _worktree_enter "$worktree_path"
 }
 
 function _worktree_remove() {
   local branch parent worktree_path
 
   branch="$1"
-  if [ -z "$branch" ]; then
-    echo "You must provide a branch for worktree" >&2
-    _worktree_usage >&2
-    return 1
-  fi
+  _worktree_require_branch "$branch" || return 1
 
   _worktree_require_git_repo || return 1
 
@@ -316,7 +357,7 @@ function _worktree_remove() {
 }
 
 function _worktree_prune() {
-  local parent worktree_path branch_ref branch_name line removed failed reason
+  local parent worktree_path branch_ref line removed failed
 
   _worktree_require_git_repo || return 1
 
@@ -328,32 +369,12 @@ function _worktree_prune() {
   failed=0
 
   _worktree_prune_process() {
-    local worktree_path="$1" branch_ref="$2"
-    local branch_name reason
-
-    [ -n "$worktree_path" ] || return
-    [ "$worktree_path" != "$parent" ] || return
-
-    branch_name="$(_worktree_branch_name "$branch_ref")"
-
-    if [ ! -d "$worktree_path" ]; then
-      reason="missing directory"
-    elif _worktree_is_older_than_days "$worktree_path" "${LFG_PRUNE_OLDER_THAN_DAYS:-1}"; then
-      reason="older than ${LFG_PRUNE_OLDER_THAN_DAYS:-1} day(s)"
-    elif ! _worktree_branch_has_remote "$branch_name"; then
-      reason="no remote branch"
-    else
-      return
-    fi
-
-    printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
-    if [ ! -d "$worktree_path" ]; then
-      removed=1
-    elif git -C "$parent" worktree remove "$worktree_path"; then
-      removed=1
-    else
-      failed=1
-    fi
+    _worktree_prune_record "$parent" "$worktree_path" "$branch_ref"
+    case "$?" in
+      0) removed=1 ;;
+      2) ;;
+      *) failed=1 ;;
+    esac
   }
 
   while IFS= read -r line; do
