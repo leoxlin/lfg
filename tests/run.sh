@@ -234,18 +234,22 @@ run_install_auto_detect_case() {
     zsh)
       assert_file_contains "$zdotdir/.zshrc" "source \"$install_dir/lfg.zsh\"" "install/$case_name zsh config"
       assert_file_contains_before "$zdotdir/.zshrc" "function lfg_worktree_setup() {" "source \"$install_dir/lfg.zsh\"" "install/$case_name zsh hook before source"
+      assert_file_exists "$install_dir/completions/lfg.entrypoints" "install/$case_name zsh entrypoint completions"
       ;;
     bash)
       assert_file_contains "$home/.bashrc" "source \"$install_dir/lfg.bash\"" "install/$case_name bash config"
       assert_file_contains_before "$home/.bashrc" "function lfg_worktree_setup() {" "source \"$install_dir/lfg.bash\"" "install/$case_name bash hook before source"
+      assert_file_exists "$install_dir/completions/lfg.entrypoints" "install/$case_name bash entrypoint completions"
       ;;
     fish)
       assert_file_exists "$xdg_config_home/fish/functions/lfg.fish" "install/$case_name fish function"
       assert_file_exists "$xdg_config_home/fish/completions/lfg.fish" "install/$case_name fish completion"
+      assert_file_exists "$xdg_config_home/fish/completions/lfg.entrypoints" "install/$case_name fish entrypoint completions"
       ;;
     oh-my-zsh)
       assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.zsh" "install/$case_name oh-my-zsh script"
       assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.plugin.zsh" "install/$case_name oh-my-zsh plugin"
+      assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/completions/lfg.entrypoints" "install/$case_name oh-my-zsh entrypoint completions"
       ;;
     *)
       fail "install/$case_name: unknown expected method"
@@ -322,20 +326,24 @@ run_install_idempotent_case() {
       assert_file_contains_before "$config_file" "function lfg_worktree_setup() {" "source \"$install_dir/lfg.zsh\"" "install/idempotent-$method zsh hook before source"
       assert_eq "$(cat "$config_file")" "$before" "install/idempotent-$method config unchanged"
       assert_file_contains "$second_output" "already installed" "install/idempotent-$method already installed message"
+      assert_file_exists "$install_dir/completions/lfg.entrypoints" "install/idempotent-$method entrypoint completions"
       ;;
     bash)
       assert_file_contains "$config_file" "source \"$install_dir/lfg.bash\"" "install/idempotent-$method bash config"
       assert_file_contains_before "$config_file" "function lfg_worktree_setup() {" "source \"$install_dir/lfg.bash\"" "install/idempotent-$method bash hook before source"
       assert_eq "$(cat "$config_file")" "$before" "install/idempotent-$method config unchanged"
       assert_file_contains "$second_output" "already installed" "install/idempotent-$method already installed message"
+      assert_file_exists "$install_dir/completions/lfg.entrypoints" "install/idempotent-$method entrypoint completions"
       ;;
     fish)
       assert_file_exists "$xdg_config_home/fish/functions/lfg.fish" "install/idempotent-$method fish function"
       assert_file_exists "$xdg_config_home/fish/completions/lfg.fish" "install/idempotent-$method fish completion"
+      assert_file_exists "$xdg_config_home/fish/completions/lfg.entrypoints" "install/idempotent-$method fish entrypoint completions"
       ;;
     oh-my-zsh)
       assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.zsh" "install/idempotent-$method oh-my-zsh script"
       assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.plugin.zsh" "install/idempotent-$method oh-my-zsh plugin"
+      assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/completions/lfg.entrypoints" "install/idempotent-$method oh-my-zsh entrypoint completions"
       ;;
   esac
 
@@ -389,6 +397,7 @@ run_install_replaces_install_dir_case() {
     bash "$ROOT/install.sh" > "$second_output" 2>&1
 
   assert_file_exists "$installed_file" "install/replaces-install-dir-$method copied script"
+  assert_file_exists "$install_dir/completions/lfg.entrypoints" "install/replaces-install-dir-$method copied entrypoint completions"
   if [ -e "$stale_file" ] || [ -e "$stale_dir" ]; then
     fail "install/replaces-install-dir-$method: expected stale install dir contents to be removed"
   fi
@@ -439,6 +448,7 @@ run_install_remote_release_case() {
   fi
 
   assert_file_exists "$install_dir/lfg.zsh" "install/remote-release-$case_name installed zsh script"
+  assert_file_exists "$install_dir/completions/lfg.entrypoints" "install/remote-release-$case_name installed entrypoint completions"
   assert_file_contains "$curl_log" "$expected_url" "install/remote-release-$case_name downloaded expected release"
 
   echo "ok - install/remote-release-$case_name"
@@ -782,6 +792,132 @@ EOF
   echo "ok - setup-hook/$shell_name"
 }
 
+run_lfg_completion_file_case() {
+  local shell_name="$1"
+  local shell_bin="$2"
+  local tmp="$tmp_root/completion-file-$shell_name"
+  local completions_file="$tmp/entrypoint-completions.txt"
+  local output_file="$tmp/completion.out"
+  local script="$tmp/completion.$shell_name"
+  local expected
+
+  if ! command -v "$shell_bin" >/dev/null 2>&1; then
+    echo "skip - completion-file/$shell_name not found"
+    return 0
+  fi
+
+  mkdir -p "$tmp"
+  {
+    printf '# custom lfg entrypoint completions\n'
+    printf '\n'
+    printf 'custom-agent\n'
+    printf 'another-agent extra fields are ignored\n'
+  } > "$completions_file"
+
+  case "$shell_name" in
+    bash)
+      cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -o pipefail
+source "$ROOT/lfg.bash" || exit 1
+_lfg_entrypoint_completions > "$output_file"
+EOF
+      ;;
+    zsh)
+      cat > "$script" <<EOF
+#!/usr/bin/env zsh
+emulate -R zsh
+set -o pipefail
+source "$ROOT/lfg.zsh" || exit 1
+_lfg_entrypoint_completions > "$output_file"
+EOF
+      ;;
+    fish)
+      cat > "$script" <<EOF
+#!/usr/bin/env fish
+source "$ROOT/completions/lfg.fish"
+or exit 1
+__lfg_entrypoint_completions > "$output_file"
+EOF
+      ;;
+    *)
+      fail "unknown shell: $shell_name"
+      ;;
+  esac
+
+  chmod +x "$script"
+
+  if ! LFG_COMPLETIONS_FILE="$completions_file" run_shell_script "$shell_name" "$shell_bin" "$script"; then
+    echo "stdout:" >&2
+    cat "$output_file" >&2 || true
+    fail "completion-file/$shell_name failed"
+  fi
+
+  expected=$'custom-agent\nanother-agent'
+  assert_eq "$(cat "$output_file")" "$expected" "completion-file/$shell_name entrypoint completions"
+
+  echo "ok - completion-file/$shell_name"
+}
+
+run_lfg_completion_missing_file_case() {
+  local shell_name="$1"
+  local shell_bin="$2"
+  local tmp="$tmp_root/completion-missing-file-$shell_name"
+  local completions_file="$tmp/missing-entrypoint-completions.txt"
+  local output_file="$tmp/completion.out"
+  local script="$tmp/completion-missing.$shell_name"
+
+  if ! command -v "$shell_bin" >/dev/null 2>&1; then
+    echo "skip - completion-missing-file/$shell_name not found"
+    return 0
+  fi
+
+  mkdir -p "$tmp"
+
+  case "$shell_name" in
+    bash)
+      cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -o pipefail
+source "$ROOT/lfg.bash" || exit 1
+_lfg_entrypoint_completions > "$output_file" || true
+EOF
+      ;;
+    zsh)
+      cat > "$script" <<EOF
+#!/usr/bin/env zsh
+emulate -R zsh
+set -o pipefail
+source "$ROOT/lfg.zsh" || exit 1
+_lfg_entrypoint_completions > "$output_file" || true
+EOF
+      ;;
+    fish)
+      cat > "$script" <<EOF
+#!/usr/bin/env fish
+source "$ROOT/completions/lfg.fish"
+or exit 1
+__lfg_entrypoint_completions > "$output_file"; or true
+EOF
+      ;;
+    *)
+      fail "unknown shell: $shell_name"
+      ;;
+  esac
+
+  chmod +x "$script"
+
+  if ! LFG_COMPLETIONS_FILE="$completions_file" run_shell_script "$shell_name" "$shell_bin" "$script"; then
+    echo "stdout:" >&2
+    cat "$output_file" >&2 || true
+    fail "completion-missing-file/$shell_name failed"
+  fi
+
+  assert_eq "$(cat "$output_file")" "" "completion-missing-file/$shell_name entrypoint completions"
+
+  echo "ok - completion-missing-file/$shell_name"
+}
+
 run_lfg_update_bash_case() {
   local tmp="$tmp_root/lfg-update-bash"
   local bin_dir="$tmp/bin"
@@ -847,6 +983,14 @@ run_lfg_update_bash_case
 run_lfg_help_case "bash" "bash"
 run_lfg_help_case "zsh" "zsh"
 run_lfg_help_case "fish" "fish"
+
+run_lfg_completion_file_case "bash" "bash"
+run_lfg_completion_file_case "zsh" "zsh"
+run_lfg_completion_file_case "fish" "fish"
+
+run_lfg_completion_missing_file_case "bash" "bash"
+run_lfg_completion_missing_file_case "zsh" "zsh"
+run_lfg_completion_missing_file_case "fish" "fish"
 
 run_worktree_setup_hook_case "bash" "bash"
 run_worktree_setup_hook_case "zsh" "zsh"

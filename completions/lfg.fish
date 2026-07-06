@@ -1,16 +1,36 @@
 # Release version: 0.2.0 # x-release-please-version
 
+set -g __lfg_completion_dir (status dirname)
+
 complete -c lfg -f
 
 complete -c lfg -n '__fish_is_first_token' -a '--update' -d 'update lfg'
 complete -c lfg -n '__fish_is_first_token' -a '--help' -d 'show usage'
-complete -c lfg -n '__fish_is_first_token' -a 'claude' -d 'launch claude'
-complete -c lfg -n '__fish_is_first_token' -a 'antigravity' -d 'launch antigravity'
-complete -c lfg -n '__fish_is_first_token' -a 'codex' -d 'launch codex'
-complete -c lfg -n '__fish_is_first_token' -a 'cursor' -d 'launch cursor'
-complete -c lfg -n '__fish_is_first_token' -a 'kimi' -d 'launch kimi'
-complete -c lfg -n '__fish_is_first_token' -a 'kimi-code' -d 'launch kimi-code'
-complete -c lfg -n '__fish_is_first_token' -a 'opencode' -d 'launch opencode'
-complete -c lfg -n '__fish_is_first_token' -a 'pi' -d 'launch pi'
-complete -c lfg -n '__fish_is_first_token' -a 'aider' -d 'launch aider'
-complete -c lfg -n '__fish_is_first_token' -a 'gemini' -d 'launch gemini'
+
+function __lfg_completions_file
+    if set -q LFG_COMPLETIONS_FILE
+        echo "$LFG_COMPLETIONS_FILE"
+    else if set -q __lfg_completion_dir
+        echo "$__lfg_completion_dir/lfg.entrypoints"
+    end
+end
+
+function __lfg_file_entrypoint_completions
+    set -l completions_file (__lfg_completions_file)
+
+    if test -z "$completions_file"
+        return 1
+    end
+
+    if not test -r "$completions_file"
+        return 1
+    end
+
+    awk 'NF && $1 !~ /^#/ { print $1 }' "$completions_file"
+end
+
+function __lfg_entrypoint_completions
+    __lfg_file_entrypoint_completions
+end
+
+complete -c lfg -n '__fish_is_first_token' -a '(__lfg_entrypoint_completions)' -d 'launch agent'

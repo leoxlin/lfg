@@ -175,8 +175,9 @@ install_source_shell() {
   local config_file="$3"
 
   echo "Installing lfg for $shell_name"
-  mkdir -p "$LFG_INSTALL_DIR"
+  mkdir -p "$LFG_INSTALL_DIR/completions"
   cp -f "$REPO_ROOT/$script_name" "$LFG_INSTALL_DIR/$script_name"
+  cp -f "$REPO_ROOT/completions/lfg.entrypoints" "$LFG_INSTALL_DIR/completions/lfg.entrypoints"
   if shell_has_lfg "$shell_name"; then
     echo "lfg is already installed for $shell_name; skipping ${config_file##*/} update"
   else
@@ -189,15 +190,17 @@ install_fish() {
   mkdir -p "$FISH_CONFIG_DIR/functions" "$FISH_CONFIG_DIR/completions"
   cp -f "$REPO_ROOT/functions/"*.fish "$FISH_CONFIG_DIR/functions/"
   cp -f "$REPO_ROOT/completions/"*.fish "$FISH_CONFIG_DIR/completions/"
+  cp -f "$REPO_ROOT/completions/lfg.entrypoints" "$FISH_CONFIG_DIR/completions/lfg.entrypoints"
 }
 
 install_oh_my_zsh() {
   echo "Installing lfg as an Oh My Zsh plugin"
   local zsh_custom="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
   local plugin_dir="$zsh_custom/plugins/lfg"
-  mkdir -p "$plugin_dir"
+  mkdir -p "$plugin_dir/completions"
   cp -f "$REPO_ROOT/lfg.zsh" "$plugin_dir/lfg.zsh"
   cp -f "$REPO_ROOT/lfg.plugin.zsh" "$plugin_dir/lfg.plugin.zsh"
+  cp -f "$REPO_ROOT/completions/lfg.entrypoints" "$plugin_dir/completions/lfg.entrypoints"
   echo "Plugin installed to $plugin_dir"
   if shell_has_lfg zsh; then
     echo "lfg is already installed for zsh"

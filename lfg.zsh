@@ -30,6 +30,8 @@
 # - Define lfg_worktree_setup before sourcing lfg to run optional setup before
 #   entering a worktree.
 
+typeset -g __lfg_dir="${${(%):-%x}:A:h}"
+
 function _worktree_usage() {
   echo "usage: worktree                         (interactive: pick branch/worktree; repo selection only when outside a repo)"
   echo "       worktree add <branch_name>"
@@ -529,6 +531,28 @@ function _lfg_usage() {
   echo "       lfg --help"
 }
 
+function _lfg_completions_file() {
+  if [ -n "${LFG_COMPLETIONS_FILE:-}" ]; then
+    echo "$LFG_COMPLETIONS_FILE"
+  else
+    echo "$__lfg_dir/completions/lfg.entrypoints"
+  fi
+}
+
+function _lfg_file_entrypoint_completions() {
+  local completions_file
+
+  completions_file="$(_lfg_completions_file)" || return 1
+  [ -n "$completions_file" ] || return 1
+  [ -r "$completions_file" ] || return 1
+
+  awk 'NF && $1 !~ /^#/ { print $1 }' "$completions_file"
+}
+
+function _lfg_entrypoint_completions() {
+  _lfg_file_entrypoint_completions
+}
+
 function lfg() {
   local entrypoint branch repo
 
@@ -576,20 +600,16 @@ function lfg() {
 }
 
 function _lfg_complete() {
+  local entrypoint_completions
+
   case "$CURRENT" in
-    2) _values 'entrypoint' \
+    2)
+      entrypoint_completions=("${(@f)$(_lfg_entrypoint_completions)}")
+      _values 'entrypoint' \
       '--update' \
       '--help' \
-      'claude' \
-      'antigravity' \
-      'codex' \
-      'cursor' \
-      'kimi' \
-      'kimi-code' \
-      'opencode' \
-      'pi' \
-      'aider' \
-      'gemini' ;;
+      $entrypoint_completions
+      ;;
   esac
 }
 

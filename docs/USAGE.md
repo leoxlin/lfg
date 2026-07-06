@@ -62,10 +62,17 @@ After removals, it runs `git worktree prune` from the main checkout.
 
 ## Completion
 
-Tab completion is available for `--help`, `--update`, and the agent entrypoints:
+Tab completion is available for `--help`, `--update`, and entrypoint completion
+suggestions. By default, entrypoint completion suggestions use the bundled
+`completions/lfg.entrypoints` file.
+
+Options:
 
 - `--help`
 - `--update`
+
+Bundled entrypoint completions:
+
 - `claude`
 - `antigravity`
 - `codex`
@@ -77,6 +84,11 @@ Tab completion is available for `--help`, `--update`, and the agent entrypoints:
 - `aider`
 - `gemini`
 
+Set `LFG_COMPLETIONS_FILE` to load entrypoint completion suggestions from
+another file. The file is newline-delimited; blank lines and lines starting
+with `#` are ignored. If the configured or bundled file is unreadable,
+entrypoint completion is empty.
+
 ## Configuration
 
 Configure `lfg` with environment variables.
@@ -87,6 +99,7 @@ Configure `lfg` with environment variables.
 | `LFG_PRUNE_OLDER_THAN_DAYS` | `1` | Worktrees older than this many days are pruned. |
 | `LFG_FZF_HIGHLIGHT_COLOR` | `green` | Highlight color passed to `fzf`. |
 | `LFG_SOURCE_DIR` | `~/src` | Root directory scanned for repos when `lfg` is run outside a git repo. |
+| `LFG_COMPLETIONS_FILE` | bundled `completions/lfg.entrypoints` | Newline-delimited file of `lfg` entrypoint completion suggestions. Blank lines and lines starting with `#` are ignored. |
 | `LFG_INSTALL_DIR` | `~/.config/lfg` | Directory replaced by `install.sh` on every run. Remote installs stage release files in `$LFG_INSTALL_DIR/repo`. |
 | `LFG_RELEASE_VERSION` | `latest` | Release version installed by remote installs and `lfg --update`. Use values like `0.1.0`; tags with a leading `v` are also accepted. |
 | `INSTALL_SHELL` | unset | Shell selected by `install.sh` auto-detection. Accepts `zsh`, `bash`, `fish`, `oh-my-zsh`, or a path ending in `zsh`, `bash`, or `fish`. |

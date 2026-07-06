@@ -125,7 +125,11 @@ source /path/to/lfg/lfg.zsh
 source /path/to/lfg/lfg.bash
 ```
 
-For fish, copy `functions/` and `completions/` into `~/.config/fish/` and reload.
+Keep `completions/lfg.entrypoints` under the same parent as `lfg.zsh` or
+`lfg.bash` for the bundled entrypoint completion suggestions. For fish, copy
+`functions/` and `completions/` into `~/.config/fish/` and reload;
+`completions/lfg.entrypoints` is installed as the bundled entrypoint completion
+file.
 
 ## Supported Shells
 
@@ -133,6 +137,6 @@ For fish, copy `functions/` and `completions/` into `~/.config/fish/` and reload
 
 | Shell | Files | Completion |
 |-------|-------|------------|
-| zsh | `lfg.zsh` | zsh compsys (`compdef`) |
-| bash | `lfg.bash` | bash `complete -F` |
-| fish | `functions/lfg.fish`, `functions/worktree.fish` | `completions/lfg.fish`, `completions/worktree.fish` |
+| zsh | `lfg.zsh`, `completions/lfg.entrypoints` | zsh compsys (`compdef`) |
+| bash | `lfg.bash`, `completions/lfg.entrypoints` | bash `complete -F` |
+| fish | `functions/lfg.fish`, `functions/worktree.fish` | `completions/lfg.fish`, `completions/worktree.fish`, `completions/lfg.entrypoints` |
