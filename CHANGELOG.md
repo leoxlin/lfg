@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.0](https://github.com/leoxlin/lfg/compare/v0.1.0...v0.2.0) (2026-07-06)
+
+
+### Features
+
+* add update & install from release ([64ccef3](https://github.com/leoxlin/lfg/commit/64ccef3aea85a138e95dc70a465a90e61aa52af4))
+* install using tar ([54d80d2](https://github.com/leoxlin/lfg/commit/54d80d2d0e74a1d3ee5d3bf39e686b8ead2e8533))
+* only support leoxlin/lfg ([bb7765d](https://github.com/leoxlin/lfg/commit/bb7765d3ab692d19d4d6825b1b60bf87f329f254))
+
 ## 0.1.0 (2026-07-06)
 
 

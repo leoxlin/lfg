@@ -1,4 +1,4 @@
-# Release version: 0.1.0 # x-release-please-version
+# Release version: 0.2.0 # x-release-please-version
 
 complete -c lfg -f
 
