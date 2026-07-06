@@ -2,6 +2,8 @@
 
 ```text
 lfg [entrypoint]
+lfg --help
+lfg --update
 ```
 
 - `entrypoint`: the command to run once inside the worktree. Defaults to `${LFG_DEFAULT_AGENT_COMMAND:-claude}`.
@@ -10,6 +12,7 @@ Examples:
 
 - `lfg` - launch the default agent in a picked branch.
 - `lfg codex` - launch `codex` in a picked branch.
+- `lfg --help` - show usage.
 - `lfg --update` - download and install the latest lfg release.
 
 ## Behavior
@@ -18,6 +21,7 @@ Examples:
 - When not already inside a linked worktree, `lfg` asks you to pick an existing worktree branch or type a new branch name to create one.
 - If already inside a linked worktree, `lfg` launches the agent in the current directory.
 - Otherwise, `lfg` creates or switches to the selected worktree through `worktree`, then launches the agent there.
+- `lfg --help` prints usage and exits without selecting a repo, entering a worktree, or launching an entrypoint.
 - `lfg --update` reruns the remote installer and downloads the latest GitHub release by default.
 - Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>` and reused by branch.
 - If a `lfg_worktree_setup` function exists, `lfg` calls it with the worktree path before entering a worktree.
@@ -58,8 +62,9 @@ After removals, it runs `git worktree prune` from the main checkout.
 
 ## Completion
 
-Tab completion is available for `--update` and the agent entrypoints:
+Tab completion is available for `--help`, `--update`, and the agent entrypoints:
 
+- `--help`
 - `--update`
 - `claude`
 - `antigravity`

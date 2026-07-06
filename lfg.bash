@@ -7,6 +7,7 @@
 #     lfg               -> claude in a picked branch
 #     lfg codex         -> codex in a picked branch
 #     lfg --update      -> download and install the latest lfg release
+#     lfg --help        -> show usage
 # - Outside a git repo: pick one from $LFG_SOURCE_DIR via fzf (type to filter).
 # - When not already inside a linked worktree: pick an existing worktree branch,
 #   or type a new name to create one.
@@ -510,6 +511,7 @@ function _lfg_update() {
 function _lfg_usage() {
   echo "usage: lfg [entrypoint]"
   echo "       lfg --update"
+  echo "       lfg --help"
 }
 
 function lfg() {
@@ -522,6 +524,11 @@ function lfg() {
 
   if [ "${1:-}" = "--update" ]; then
     _lfg_update
+    return
+  fi
+
+  if [ "${1:-}" = "--help" ]; then
+    _lfg_usage
     return
   fi
 
@@ -560,7 +567,7 @@ function _lfg_completion() {
 
   case "$COMP_CWORD" in
     1)
-      COMPREPLY=( $(compgen -W "--update claude antigravity codex cursor kimi kimi-code opencode pi aider gemini" -- "$cur") )
+      COMPREPLY=( $(compgen -W "--update --help claude antigravity codex cursor kimi kimi-code opencode pi aider gemini" -- "$cur") )
       ;;
   esac
 }

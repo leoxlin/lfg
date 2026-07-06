@@ -7,6 +7,7 @@
 #     lfg               -> claude in a picked branch
 #     lfg codex         -> codex in a picked branch
 #     lfg --update      -> download and install the latest lfg release
+#     lfg --help        -> show usage
 # - Outside a git repo: pick one from $LFG_SOURCE_DIR via fzf (type to filter).
 # - When not already inside a linked worktree: pick an existing worktree branch,
 #   or type a new name to create one.
@@ -72,6 +73,7 @@ end
 function _lfg_usage
     echo "usage: lfg [entrypoint]"
     echo "       lfg --update"
+    echo "       lfg --help"
 end
 
 function lfg
@@ -82,6 +84,11 @@ function lfg
 
     if set -q argv[1]; and test "$argv[1]" = --update
         _lfg_update
+        return
+    end
+
+    if set -q argv[1]; and test "$argv[1]" = --help
+        _lfg_usage
         return
     end
 

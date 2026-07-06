@@ -3,6 +3,7 @@
 complete -c lfg -f
 
 complete -c lfg -n '__fish_is_first_token' -a '--update' -d 'update lfg'
+complete -c lfg -n '__fish_is_first_token' -a '--help' -d 'show usage'
 complete -c lfg -n '__fish_is_first_token' -a 'claude' -d 'launch claude'
 complete -c lfg -n '__fish_is_first_token' -a 'antigravity' -d 'launch antigravity'
 complete -c lfg -n '__fish_is_first_token' -a 'codex' -d 'launch codex'

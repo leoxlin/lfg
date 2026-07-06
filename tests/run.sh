@@ -526,6 +526,74 @@ run_shell_script() {
   esac
 }
 
+run_lfg_help_case() {
+  local shell_name="$1"
+  local shell_bin="$2"
+  local tmp="$tmp_root/help-$shell_name"
+  local output_file="$tmp/help.out"
+  local stderr_file="$tmp/help.err"
+  local script="$tmp/help.$shell_name"
+
+  if ! command -v "$shell_bin" >/dev/null 2>&1; then
+    echo "skip - help/$shell_name not found"
+    return 0
+  fi
+
+  mkdir -p "$tmp"
+
+  case "$shell_name" in
+    bash)
+      cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -o pipefail
+source "$ROOT/lfg.bash" || exit 1
+lfg --help > "$output_file" 2> "$stderr_file"
+EOF
+      ;;
+    zsh)
+      cat > "$script" <<EOF
+#!/usr/bin/env zsh
+emulate -R zsh
+set -o pipefail
+source "$ROOT/lfg.zsh" || exit 1
+lfg --help > "$output_file" 2> "$stderr_file"
+EOF
+      ;;
+    fish)
+      cat > "$script" <<EOF
+#!/usr/bin/env fish
+source "$ROOT/functions/lfg.fish"
+or exit 1
+lfg --help > "$output_file" 2> "$stderr_file"
+EOF
+      ;;
+    *)
+      fail "unknown shell: $shell_name"
+      ;;
+  esac
+
+  chmod +x "$script"
+
+  if ! run_shell_script "$shell_name" "$shell_bin" "$script"; then
+    echo "stdout:" >&2
+    cat "$output_file" >&2 || true
+    echo "stderr:" >&2
+    cat "$stderr_file" >&2 || true
+    fail "help/$shell_name failed"
+  fi
+
+  assert_file_contains "$output_file" "usage: lfg [entrypoint]" "help/$shell_name usage"
+  assert_file_contains "$output_file" "lfg --update" "help/$shell_name update"
+  assert_file_contains "$output_file" "lfg --help" "help/$shell_name help"
+
+  if [ -s "$stderr_file" ]; then
+    cat "$stderr_file" >&2 || true
+    fail "help/$shell_name: expected empty stderr"
+  fi
+
+  echo "ok - help/$shell_name"
+}
+
 run_case() {
   local shell_name="$1"
   local shell_bin="$2"
@@ -775,6 +843,10 @@ tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/lfg-tests.XXXXXX")"
 run_install_cases
 
 run_lfg_update_bash_case
+
+run_lfg_help_case "bash" "bash"
+run_lfg_help_case "zsh" "zsh"
+run_lfg_help_case "fish" "fish"
 
 run_worktree_setup_hook_case "bash" "bash"
 run_worktree_setup_hook_case "zsh" "zsh"
