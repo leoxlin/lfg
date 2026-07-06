@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0](https://github.com/leoxlin/lfg/compare/v0.2.0...v0.3.0) (2026-07-06)
+
+
+### Features
+
+* add --help ([d771253](https://github.com/leoxlin/lfg/commit/d771253d5cb91387c85074086cf07129c5485791))
+* add support more auto comp ([fc4829a](https://github.com/leoxlin/lfg/commit/fc4829abbde343c77749f75b4ead8ead9a7a67df))
+* bundle entrypoint completions ([f96b518](https://github.com/leoxlin/lfg/commit/f96b51856a9e5b9cb849815a50a256747e05306b))
+* custom lfg_worktree_setup func ([9246584](https://github.com/leoxlin/lfg/commit/92465848037bfa7e0bf8a52556a203f3349e85f1))
+* end worktree path as repo name ([f6d01d6](https://github.com/leoxlin/lfg/commit/f6d01d6e6eed765b2273af3b073e154669b5aa01))
+* error on bad LFG_SOURCE_DIR ([28a4df4](https://github.com/leoxlin/lfg/commit/28a4df41ab40d9f959023eefc6086be4388c8314))
+* improve tooltip ([bbcb9ca](https://github.com/leoxlin/lfg/commit/bbcb9ca930b2c07de468e1217475efc7288cffcc))
+* swap to --update, rm branch arg ([720cc3d](https://github.com/leoxlin/lfg/commit/720cc3dc44f623f51cdc20227a45780c6fd760d5))
+* try to discover sources dir ([16f5026](https://github.com/leoxlin/lfg/commit/16f502675b5de8fbe8af13013255d4f3bb8422b5))
+* update prune default to 7 days ([ee555a5](https://github.com/leoxlin/lfg/commit/ee555a5a0f03814798c71a5c8d058bf81e2c31f9))
+
+
+### Bug Fixes
+
+* make update work ([552bd57](https://github.com/leoxlin/lfg/commit/552bd578885dc106e478d868e24f3af56f81e78a))
+* pointer color ([8f0fed7](https://github.com/leoxlin/lfg/commit/8f0fed7b1d905cc741e63f63e61f7bf0557f2d0e))
+
 ## [0.2.0](https://github.com/leoxlin/lfg/compare/v0.1.0...v0.2.0) (2026-07-06)
 
 
