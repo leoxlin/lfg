@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/leoxlin/lfg/compare/v0.4.0...v0.4.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* remove dir fish update ([c0e4607](https://github.com/leoxlin/lfg/commit/c0e4607a3c42b1bc0eed43b59e3d006f6a8d12ff))
+
 ## [0.4.0](https://github.com/leoxlin/lfg/compare/v0.3.0...v0.4.0) (2026-07-06)
 
 
