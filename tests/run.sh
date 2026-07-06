@@ -46,6 +46,24 @@ assert_file_contains() {
   fi
 }
 
+assert_file_contains_before() {
+  local file="$1"
+  local first="$2"
+  local second="$3"
+  local message="$4"
+  local first_line second_line
+
+  assert_file_contains "$file" "$first" "$message first marker"
+  assert_file_contains "$file" "$second" "$message second marker"
+
+  first_line="$(grep -Fn "$first" "$file" | sed -n '1s/:.*//p')"
+  second_line="$(grep -Fn "$second" "$file" | sed -n '1s/:.*//p')"
+
+  if [ "$first_line" -ge "$second_line" ]; then
+    fail "$message: expected '$first' before '$second'"
+  fi
+}
+
 field() {
   local name="$1"
   local file="$2"
@@ -215,9 +233,11 @@ run_install_auto_detect_case() {
   case "$expected_method" in
     zsh)
       assert_file_contains "$zdotdir/.zshrc" "source \"$install_dir/lfg.zsh\"" "install/$case_name zsh config"
+      assert_file_contains_before "$zdotdir/.zshrc" "function lfg_worktree_setup() {" "source \"$install_dir/lfg.zsh\"" "install/$case_name zsh hook before source"
       ;;
     bash)
       assert_file_contains "$home/.bashrc" "source \"$install_dir/lfg.bash\"" "install/$case_name bash config"
+      assert_file_contains_before "$home/.bashrc" "function lfg_worktree_setup() {" "source \"$install_dir/lfg.bash\"" "install/$case_name bash hook before source"
       ;;
     fish)
       assert_file_exists "$xdg_config_home/fish/functions/lfg.fish" "install/$case_name fish function"
@@ -299,11 +319,13 @@ run_install_idempotent_case() {
   case "$method" in
     zsh)
       assert_file_contains "$config_file" "source \"$install_dir/lfg.zsh\"" "install/idempotent-$method zsh config"
+      assert_file_contains_before "$config_file" "function lfg_worktree_setup() {" "source \"$install_dir/lfg.zsh\"" "install/idempotent-$method zsh hook before source"
       assert_eq "$(cat "$config_file")" "$before" "install/idempotent-$method config unchanged"
       assert_file_contains "$second_output" "already installed" "install/idempotent-$method already installed message"
       ;;
     bash)
       assert_file_contains "$config_file" "source \"$install_dir/lfg.bash\"" "install/idempotent-$method bash config"
+      assert_file_contains_before "$config_file" "function lfg_worktree_setup() {" "source \"$install_dir/lfg.bash\"" "install/idempotent-$method bash hook before source"
       assert_eq "$(cat "$config_file")" "$before" "install/idempotent-$method config unchanged"
       assert_file_contains "$second_output" "already installed" "install/idempotent-$method already installed message"
       ;;
@@ -606,6 +628,88 @@ run_shell_cases() {
   done
 }
 
+run_worktree_setup_hook_case() {
+  local shell_name="$1"
+  local shell_bin="$2"
+  local tmp="$tmp_root/setup-hook-$shell_name"
+  local source_dir="$tmp/src"
+  local repo="$source_dir/repo"
+  local hook_log="$tmp/hook.log"
+  local output_file="$tmp/hook.out"
+  local stderr_file="$tmp/hook.err"
+  local script="$tmp/setup-hook.$shell_name"
+  local expected_worktree="$source_dir/.agents/worktrees/repo-feat-existing"
+
+  if ! command -v "$shell_bin" >/dev/null 2>&1; then
+    echo "skip - setup-hook/$shell_name not found"
+    return 0
+  fi
+
+  setup_repo "$tmp"
+
+  case "$shell_name" in
+    bash)
+      cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -o pipefail
+function lfg_worktree_setup() {
+  printf '%s\n' "\$1" > "$hook_log"
+}
+source "$ROOT/lfg.bash" || exit 1
+cd "$repo" || exit 1
+worktree cd feat/existing > "$output_file" 2> "$stderr_file"
+pwd >> "$output_file"
+EOF
+      ;;
+    zsh)
+      cat > "$script" <<EOF
+#!/usr/bin/env zsh
+emulate -R zsh
+set -o pipefail
+function lfg_worktree_setup() {
+  printf '%s\n' "\$1" > "$hook_log"
+}
+source "$ROOT/lfg.zsh" || exit 1
+cd "$repo" || exit 1
+worktree cd feat/existing > "$output_file" 2> "$stderr_file"
+pwd >> "$output_file"
+EOF
+      ;;
+    fish)
+      cat > "$script" <<EOF
+#!/usr/bin/env fish
+function lfg_worktree_setup
+    printf '%s\n' "\$argv[1]" > "$hook_log"
+end
+source "$ROOT/functions/lfg.fish"
+or exit 1
+cd "$repo"
+or exit 1
+worktree cd feat/existing > "$output_file" 2> "$stderr_file"
+pwd >> "$output_file"
+EOF
+      ;;
+    *)
+      fail "unknown shell: $shell_name"
+      ;;
+  esac
+
+  chmod +x "$script"
+
+  if ! run_shell_script "$shell_name" "$shell_bin" "$script"; then
+    echo "stdout:" >&2
+    cat "$output_file" >&2 || true
+    echo "stderr:" >&2
+    cat "$stderr_file" >&2 || true
+    fail "setup-hook/$shell_name failed"
+  fi
+
+  assert_eq "$(cat "$hook_log")" "$expected_worktree" "setup-hook/$shell_name hook path"
+  assert_eq "$(tail -n1 "$output_file")" "$expected_worktree" "setup-hook/$shell_name entered worktree"
+
+  echo "ok - setup-hook/$shell_name"
+}
+
 run_lfg_update_bash_case() {
   local tmp="$tmp_root/lfg-update-bash"
   local bin_dir="$tmp/bin"
@@ -667,6 +771,10 @@ tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/lfg-tests.XXXXXX")"
 run_install_cases
 
 run_lfg_update_bash_case
+
+run_worktree_setup_hook_case "bash" "bash"
+run_worktree_setup_hook_case "zsh" "zsh"
+run_worktree_setup_hook_case "fish" "fish"
 
 run_shell_cases "bash" "bash"
 run_shell_cases "zsh" "zsh"

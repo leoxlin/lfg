@@ -118,15 +118,11 @@ function _worktree_is_older_than_days
     test -n "$found"
 end
 
-function _worktree_mise_trust_if_untrusted
+function _worktree_run_setup
     set -l worktree_path $argv[1]
 
-    if not command -v mise >/dev/null 2>&1
-        return 0
-    end
-
-    if mise trust --show -C "$worktree_path" 2>/dev/null | string match -q '*: untrusted*'
-        mise trust -y -q -C "$worktree_path"
+    if functions -q lfg_worktree_setup
+        lfg_worktree_setup "$worktree_path"
     end
 end
 
@@ -152,7 +148,8 @@ end
 function _worktree_enter
     set -l worktree_path $argv[1]
 
-    _worktree_mise_trust_if_untrusted "$worktree_path"
+    _worktree_run_setup "$worktree_path"
+    or return 1
     cd "$worktree_path"
     or return 1
 end

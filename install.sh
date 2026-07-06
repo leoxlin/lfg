@@ -119,15 +119,22 @@ fetch_repo() {
   REPO_ROOT="$repo_dir"
 }
 
-add_line_to_file() {
-  local line="$1"
+add_source_block_to_file() {
+  local source_line="$1"
   local file="$2"
 
   mkdir -p "$(dirname "$file")"
-  if [ -f "$file" ] && grep -Fxq "$line" "$file"; then
+  if [ -f "$file" ] && grep -Fxq "$source_line" "$file"; then
     echo "Already present in $file"
   else
-    echo "$line" >> "$file"
+    {
+      echo ""
+      echo "function lfg_worktree_setup() {"
+      echo "  # Optional: customize setup before lfg enters a worktree."
+      echo "  :"
+      echo "}"
+      echo "$source_line"
+    } >> "$file"
     echo "Added to $file"
   fi
 }
@@ -173,7 +180,7 @@ install_source_shell() {
   if shell_has_lfg "$shell_name"; then
     echo "lfg is already installed for $shell_name; skipping ${config_file##*/} update"
   else
-    add_line_to_file "source \"$LFG_INSTALL_DIR/$script_name\"" "$config_file"
+    add_source_block_to_file "source \"$LFG_INSTALL_DIR/$script_name\"" "$config_file"
   fi
 }
 

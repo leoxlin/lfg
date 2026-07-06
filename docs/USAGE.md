@@ -22,7 +22,7 @@ Examples:
 - Otherwise, `lfg` creates or switches to the requested worktree through `worktree`, then launches the agent there.
 - `lfg update` reruns the remote installer and downloads the latest GitHub release by default.
 - Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>` and reused by branch.
-- If `mise` is installed, entering a worktree auto-trusts its `mise` config when it is not already trusted. This prevents `mise`'s `chpwd` hook from erroring.
+- If a `lfg_worktree_setup` function exists, `lfg` calls it with the worktree path before entering a worktree.
 
 ## Worktree Helper
 
@@ -106,6 +106,63 @@ Keep worktrees longer before pruning:
 
 ```zsh
 export LFG_PRUNE_OLDER_THAN_DAYS=7
+```
+
+Run custom setup before entering a worktree by defining `lfg_worktree_setup`
+before sourcing `lfg`. The function receives the target worktree path as its
+first argument. If it returns non-zero, `lfg` does not enter the worktree.
+
+No-op hook for zsh or bash:
+
+```bash
+function lfg_worktree_setup() {
+  # Optional: customize setup before lfg enters a worktree.
+  :
+}
+
+source "$HOME/.config/lfg/lfg.zsh" # or lfg.bash
+```
+
+No-op hook for fish:
+
+```fish
+function lfg_worktree_setup
+end
+```
+
+With the fish installer, define this in `~/.config/fish/config.fish`; fish
+autoloads `lfg` from `~/.config/fish/functions/`. For a manual fish install,
+define the hook before `source /path/to/lfg/functions/lfg.fish`.
+
+To keep the previous `mise trust` behavior, define the hook like this before
+sourcing `lfg`:
+
+```bash
+function lfg_worktree_setup() {
+  local worktree_path="$1"
+
+  command -v mise >/dev/null 2>&1 || return 0
+
+  if mise trust --show -C "$worktree_path" 2>/dev/null | grep -q ': untrusted'; then
+    mise trust -y -q -C "$worktree_path"
+  fi
+}
+```
+
+Fish equivalent:
+
+```fish
+function lfg_worktree_setup
+    set -l worktree_path $argv[1]
+
+    if not command -v mise >/dev/null 2>&1
+        return 0
+    end
+
+    if mise trust --show -C "$worktree_path" 2>/dev/null | string match -q '*: untrusted*'
+        mise trust -y -q -C "$worktree_path"
+    end
+end
 ```
 
 Install for the shell in `$SHELL` when piping the installer into Bash:

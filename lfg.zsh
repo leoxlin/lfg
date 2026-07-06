@@ -27,8 +27,8 @@
 # - Worktrees are created under $LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>
 #   and reused by branch. LFG_SOURCE_DIR defaults to ~/src if unset.
 #
-# - If mise is installed, entering a worktree auto-trusts its mise config when
-#   it is not already trusted. This prevents mise's chpwd hook from erroring.
+# - Define lfg_worktree_setup before sourcing lfg to run optional setup before
+#   entering a worktree.
 
 function _worktree_usage() {
   echo "usage: worktree                         (interactive: pick branch/worktree; repo selection only when outside a repo)"
@@ -180,13 +180,11 @@ function _worktree_prune_record() {
   git -C "$parent" worktree remove "$worktree_path"
 }
 
-function _worktree_mise_trust_if_untrusted() {
+function _worktree_run_setup() {
   local worktree_path="$1"
 
-  command -v mise >/dev/null 2>&1 || return 0
-
-  if mise trust --show -C "$worktree_path" 2>/dev/null | grep -q ': untrusted'; then
-    mise trust -y -q -C "$worktree_path"
+  if (( $+functions[lfg_worktree_setup] )); then
+    lfg_worktree_setup "$worktree_path"
   fi
 }
 
@@ -211,7 +209,7 @@ function _worktree_require_branch() {
 function _worktree_enter() {
   local worktree_path="$1"
 
-  _worktree_mise_trust_if_untrusted "$worktree_path"
+  _worktree_run_setup "$worktree_path" || return 1
   cd "$worktree_path" || return 1
 }
 
