@@ -410,6 +410,41 @@ run_install_replaces_install_dir_case() {
   echo "ok - install/replaces-install-dir-$method"
 }
 
+run_install_source_dir_prompt_case() {
+  local tmp="$tmp_root/install-source-dir-prompt"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local output_file="$tmp/install.out"
+  local source_dir="$home/Source"
+
+  mkdir -p \
+    "$home/.hidden/repo/.git" \
+    "$home/Code/repo/.git" \
+    "$source_dir/repo-one/.git" \
+    "$source_dir/repo-two/.git" \
+    "$zdotdir" \
+    "$xdg_config_home"
+
+  if ! printf 'y\n' | env -u LFG_SOURCE_DIR \
+      HOME="$home" \
+      ZDOTDIR="$zdotdir" \
+      XDG_CONFIG_HOME="$xdg_config_home" \
+      LFG_INSTALL_DIR="$install_dir" \
+      INSTALL_SHELL=zsh \
+      bash "$ROOT/install.sh" > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/source-dir-prompt failed"
+  fi
+
+  assert_file_contains "$output_file" "Found source directory: $source_dir" "install/source-dir-prompt found source dir"
+  assert_file_contains "$zdotdir/.zshrc" "export LFG_SOURCE_DIR=$source_dir" "install/source-dir-prompt zsh source dir"
+  assert_file_contains_before "$zdotdir/.zshrc" "export LFG_SOURCE_DIR=$source_dir" "source \"$install_dir/lfg.zsh\"" "install/source-dir-prompt source dir before lfg source"
+
+  echo "ok - install/source-dir-prompt"
+}
+
 run_install_remote_release_case() {
   local case_name="$1"
   local release_version="$2"
@@ -473,6 +508,8 @@ run_install_cases() {
 
   run_install_replaces_install_dir_case "zsh" "zsh"
   run_install_replaces_install_dir_case "bash" "bash"
+
+  run_install_source_dir_prompt_case
 
   run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.tar.gz"
   run_install_remote_release_case "specific" "v2.0.0" "https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.tar.gz"

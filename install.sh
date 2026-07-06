@@ -17,19 +17,31 @@ Usage: install.sh [OPTIONS]
 Install lfg shell integration.
 
 Options:
-  --install-dir   Override install directory (default: ~/.config/lfg)
-  -h, --help      Show this help message
+  --install-dir DIR  Override install directory (default: ~/.config/lfg)
+  -h, --help         Show this help message
 
-The current shell is auto-detected.
-Set INSTALL_SHELL to zsh, bash, fish, oh-my-zsh, or a shell path to override detection.
+Environment:
+  INSTALL_SHELL        Shell to configure. Accepts zsh, bash, fish, oh-my-zsh,
+                       or a shell path ending in zsh, bash, or fish. If unset,
+                       install.sh checks \$SHELL, then the shell running
+                       install.sh, then falls back to zsh.
+  LFG_INSTALL_DIR      Install directory (default: ~/.config/lfg). Replaced on
+                       every run.
+  LFG_RELEASE_VERSION  Remote install release version (default: latest). Use
+                       values like 0.1.0; tags with a leading v are accepted.
 
 Remote install:
   curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
   curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL=fish bash
+  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | LFG_RELEASE_VERSION=0.1.0 bash
+
+Local install:
+  ./install.sh
+  ./install.sh --install-dir ~/.local/share/lfg
+  INSTALL_SHELL=oh-my-zsh ./install.sh
 
 The remote installer downloads the latest GitHub release archive by default.
-Set LFG_RELEASE_VERSION to a release version such as 0.1.0 to install a
-specific release. Remote installs only support github.com/leoxlin/lfg.
+Remote installs only support github.com/leoxlin/lfg.
 EOF
 }
 
@@ -80,7 +92,7 @@ extract_release_archive() {
 
   tar -xzf "$archive_file" -C "$extract_dir"
 
-  local source_dir
+  local git_dir source_dir
   source_dir="$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d | sort | sed -n '1p')"
   if [ -z "$source_dir" ]; then
     source_dir="$extract_dir"
@@ -139,6 +151,89 @@ add_source_block_to_file() {
   fi
 }
 
+find_home_source_dir() {
+  local git_dir source_dir
+
+  if [ ! -d "$HOME" ]; then
+    return 1
+  fi
+
+  source_dir="$(
+    find "$HOME"/*/*/.git -prune -print 2>/dev/null \
+      | while IFS= read -r git_dir; do dirname "$(dirname "$git_dir")"; done \
+      | sort \
+      | uniq -c \
+      | sort -k1,1nr -k2,2 \
+      | sed -n '1s/^[[:space:]]*[0-9][0-9]*[[:space:]]//p'
+  )"
+
+  [ -n "$source_dir" ] || return 1
+  echo "$source_dir"
+}
+
+prompt_reply() {
+  local prompt="$1"
+
+  if [ ! -t 0 ] && { : >/dev/tty; } 2>/dev/null; then
+    printf "%s" "$prompt" >/dev/tty
+    IFS= read -r PROMPT_REPLY </dev/tty || PROMPT_REPLY=""
+  else
+    printf "%s" "$prompt"
+    IFS= read -r PROMPT_REPLY || PROMPT_REPLY=""
+  fi
+}
+
+maybe_add_lfg_source_dir_to_file() {
+  local file="$1"
+  local found_dir prompt source_line
+
+  if [ -n "${LFG_SOURCE_DIR:-}" ]; then
+    return 0
+  fi
+
+  if [ -f "$file" ] && grep -Eq '(^|[[:space:]])(export[[:space:]]+)?LFG_SOURCE_DIR=' "$file"; then
+    return 0
+  fi
+
+  found_dir="$(find_home_source_dir)" || found_dir=""
+
+  if [ -n "$found_dir" ]; then
+    printf -v source_line "export LFG_SOURCE_DIR=%q" "$found_dir"
+    prompt="Add '$source_line' to $file? [y/N] "
+    echo "Found source directory: $found_dir"
+    prompt_reply "$prompt"
+    case "$PROMPT_REPLY" in
+      y|Y|yes|YES|Yes)
+        ;;
+      *)
+        echo "Skipped LFG_SOURCE_DIR shell configuration update."
+        return 0
+        ;;
+    esac
+  else
+    cat <<'EOF'
+=======================================
+WARNING: Could not find a sources dir
+
+lfg requires a source dir with all your
+local git repos to function.
+
+Set this in your shell profile
+`export LFG_SOURCE_DIR=<source_dir>`
+=======================================
+EOF
+    return 0
+  fi
+
+  printf -v source_line "export LFG_SOURCE_DIR=%q" "$found_dir"
+  mkdir -p "$(dirname "$file")"
+  {
+    echo ""
+    echo "$source_line"
+  } >> "$file"
+  echo "Added LFG_SOURCE_DIR to $file"
+}
+
 shell_has_lfg() {
   local shell_name="$1"
   local shell_bin
@@ -178,6 +273,7 @@ install_source_shell() {
   mkdir -p "$LFG_INSTALL_DIR/completions"
   cp -f "$REPO_ROOT/$script_name" "$LFG_INSTALL_DIR/$script_name"
   cp -f "$REPO_ROOT/completions/lfg.entrypoints" "$LFG_INSTALL_DIR/completions/lfg.entrypoints"
+  maybe_add_lfg_source_dir_to_file "$config_file"
   if shell_has_lfg "$shell_name"; then
     echo "lfg is already installed for $shell_name; skipping ${config_file##*/} update"
   else
