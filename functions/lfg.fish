@@ -1,5 +1,5 @@
 # lfg Fish integration.
-# Release version: 0.4.0 # x-release-please-version
+# Release version: 0.4.1 # x-release-please-version
 
 # Load the worktree helpers (also defines the worktree command).
 set -l __lfg_dir (status dirname)

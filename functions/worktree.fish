@@ -1,5 +1,5 @@
 # worktree Fish integration for lfg.
-# Release version: 0.4.0 # x-release-please-version
+# Release version: 0.4.1 # x-release-please-version
 
 function _worktree_usage
     echo "usage: worktree                                 (pick branch/worktree interactively)"
