@@ -24,7 +24,7 @@
 #
 # - Repo-wide commands (list, ls, prune) take no arguments.
 #
-# - Worktrees are created under $LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>
+# - Worktrees are created under $LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>/<repo>
 #   and reused by branch. LFG_SOURCE_DIR defaults to ~/src if unset.
 #
 # - Define lfg_worktree_setup before sourcing lfg to run optional setup before
@@ -99,7 +99,7 @@ function _worktree_new_path() {
   root="$(_worktree_parent_path)" || return 1
   repo="$(basename "$root")"
 
-  echo "$(_worktree_base_dir)/$repo-${branch//\//-}"
+  echo "$(_worktree_base_dir)/$repo-${branch//\//-}/$repo"
 }
 
 function _worktree_branch_name() {

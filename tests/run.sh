@@ -189,8 +189,8 @@ setup_repo() {
   local tmp="$1"
   local source_dir="$tmp/src"
   local repo="$source_dir/repo"
-  local existing_worktree="$source_dir/.agents/worktrees/repo-feat-existing"
-  local start_worktree="$source_dir/.agents/worktrees/repo-feat-start"
+  local existing_worktree="$source_dir/.agents/worktrees/repo-feat-existing/repo"
+  local start_worktree="$source_dir/.agents/worktrees/repo-feat-start/repo"
 
   mkdir -p "$repo" || fail "creates test repo directory"
   git init -b main "$repo" >/dev/null || fail "initializes test repo"
@@ -626,7 +626,7 @@ run_case() {
   case "$context" in
     outside) start_dir="$tmp/outside" ;;
     repo) start_dir="$repo" ;;
-    worktree) start_dir="$source_dir/.agents/worktrees/repo-feat-start" ;;
+    worktree) start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo" ;;
     *) fail "$shell_name/$context/$target: unknown context" ;;
   esac
   mkdir -p "$start_dir"
@@ -641,21 +641,21 @@ run_case() {
       ;;
     new)
       branch="feat/new"
-      expected_pwd="$source_dir/.agents/worktrees/repo-feat-new"
+      expected_pwd="$source_dir/.agents/worktrees/repo-feat-new/repo"
       expected_branch="feat/new"
       expected_is_worktree="true"
       fzf_code="1"
       ;;
     existing)
       branch="feat/existing"
-      expected_pwd="$source_dir/.agents/worktrees/repo-feat-existing"
+      expected_pwd="$source_dir/.agents/worktrees/repo-feat-existing/repo"
       expected_branch="feat/existing"
       expected_is_worktree="true"
       fzf_code="0"
       ;;
     current)
       branch="feat/start"
-      expected_pwd="$source_dir/.agents/worktrees/repo-feat-start"
+      expected_pwd="$source_dir/.agents/worktrees/repo-feat-start/repo"
       expected_branch="feat/start"
       expected_is_worktree="true"
       fzf_code="0"
@@ -720,7 +720,7 @@ run_worktree_setup_hook_case() {
   local output_file="$tmp/hook.out"
   local stderr_file="$tmp/hook.err"
   local script="$tmp/setup-hook.$shell_name"
-  local expected_worktree="$source_dir/.agents/worktrees/repo-feat-existing"
+  local expected_worktree="$source_dir/.agents/worktrees/repo-feat-existing/repo"
 
   if ! command -v "$shell_bin" >/dev/null 2>&1; then
     echo "skip - setup-hook/$shell_name not found"

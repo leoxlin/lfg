@@ -75,7 +75,7 @@ function _worktree_new_path
     or return 1
     set -l repo (basename "$root")
 
-    echo "$(_worktree_base_dir)/$repo-"(string replace -a '/' '-' -- "$branch")
+    echo "$(_worktree_base_dir)/$repo-"(string replace -a '/' '-' -- "$branch")"/$repo"
 end
 
 function _worktree_branch_name

@@ -23,7 +23,7 @@ Examples:
 - Otherwise, `lfg` creates or switches to the selected worktree through `worktree`, then launches the agent there.
 - `lfg --help` prints usage and exits without selecting a repo, entering a worktree, or launching an entrypoint.
 - `lfg --update` reruns the remote installer and downloads the latest GitHub release by default.
-- Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>` and reused by branch.
+- Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>/<repo>` and reused by branch.
 - If a `lfg_worktree_setup` function exists, `lfg` calls it with the worktree path before entering a worktree.
 
 ## Worktree Helper
