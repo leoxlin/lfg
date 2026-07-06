@@ -1,5 +1,5 @@
 # lfg Bash integration.
-# Release version: 0.2.0 # x-release-please-version
+# Release version: 0.4.0 # x-release-please-version
 
 __lfg_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
