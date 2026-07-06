@@ -41,11 +41,6 @@ function _lfg_update
         set install_dir "$LFG_INSTALL_DIR"
     end
 
-    set -l release_version latest
-    if set -q LFG_RELEASE_VERSION
-        set release_version "$LFG_RELEASE_VERSION"
-    end
-
     set -l tmpdir /tmp
     if set -q TMPDIR
         set tmpdir "$TMPDIR"
@@ -59,10 +54,9 @@ function _lfg_update
         return 1
     end
 
-    env \
+    env -u LFG_RELEASE_VERSION \
         INSTALL_SHELL=fish \
         LFG_INSTALL_DIR="$install_dir" \
-        LFG_RELEASE_VERSION="$release_version" \
         bash "$install_script"
     set -l update_status $status
 

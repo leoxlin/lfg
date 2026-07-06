@@ -24,7 +24,7 @@ Examples:
 - If already inside a linked worktree, `lfg` launches the agent in the current directory.
 - Otherwise, `lfg` creates or switches to the selected worktree through `worktree`, then launches the agent there.
 - `lfg --help` prints usage and exits without selecting a repo, entering a worktree, or launching an entrypoint.
-- `lfg --update` downloads and installs the latest GitHub release by default.
+- `lfg --update` downloads the installer and lets it install the latest GitHub release.
 - Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>/<repo>` and reused by branch.
 - If a `lfg_worktree_setup` function exists, `lfg` calls it with the worktree path before entering a worktree.
 

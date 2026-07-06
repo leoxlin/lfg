@@ -54,12 +54,11 @@ Remote installs only support `github.com/leoxlin/lfg`.
 Run:
 
 ```bash
-lfg update
+lfg --update
 ```
 
-`lfg update` reruns the remote installer and downloads the latest release by
-default. Use the release environment variable documented by `install.sh --help`
-to update to a specific release.
+`lfg --update` reruns the remote installer and lets it install the latest
+release.
 
 ## Oh My Zsh Plugin
 

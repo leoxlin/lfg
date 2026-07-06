@@ -717,7 +717,7 @@ EOF
   assert_file_contains "$curl_log" "https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh" "lfg/update-bash downloaded installer"
   assert_eq "$(field install_shell "$capture")" "bash" "lfg/update-bash install shell"
   assert_eq "$(field install_dir "$capture")" "$tmp/install-dir" "lfg/update-bash install dir"
-  assert_eq "$(field release_version "$capture")" "2.0.0" "lfg/update-bash release version"
+  assert_eq "$(field release_version "$capture")" "" "lfg/update-bash lets installer choose latest release"
 
   echo "ok - lfg/update-bash"
 }
