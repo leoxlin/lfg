@@ -1,3 +1,5 @@
+# Release version: 0.0.0 # x-release-please-version
+
 complete -c worktree -f
 
 complete -c worktree -n '__fish_use_subcommand' -a 'add' -d 'create or switch to a worktree'

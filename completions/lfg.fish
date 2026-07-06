@@ -1,3 +1,5 @@
+# Release version: 0.0.0 # x-release-please-version
+
 complete -c lfg -f
 
 complete -c lfg -n '__fish_is_first_token' -a 'claude' -d 'launch claude'

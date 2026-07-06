@@ -6,6 +6,7 @@ Jump into a git worktree and start a coding agent.
 
 - [Install](docs/INSTALL.md)
 - [Usage](docs/USAGE.md)
+- [Release](docs/RELEASE.md)
 
 ## Quick Start
 

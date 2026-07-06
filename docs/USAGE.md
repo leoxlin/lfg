@@ -115,3 +115,4 @@ curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTAL
 ## Related Docs
 
 - [Installation](INSTALL.md)
+- [Release](RELEASE.md)

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "initial-version": "0.1.0",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "packages": {
+    ".": {
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "lfg.zsh"
+        },
+        {
+          "type": "generic",
+          "path": "lfg.bash"
+        },
+        {
+          "type": "generic",
+          "path": "functions/lfg.fish"
+        },
+        {
+          "type": "generic",
+          "path": "functions/worktree.fish"
+        },
+        {
+          "type": "generic",
+          "path": "completions/lfg.fish"
+        },
+        {
+          "type": "generic",
+          "path": "completions/worktree.fish"
+        }
+      ],
+      "exclude-paths": [
+        ".github",
+        "docs",
+        "scripts",
+        "tests",
+        ".release-please-manifest.json",
+        "AGENTS.md",
+        "CHANGELOG.md",
+        "README.md",
+        "install.sh",
+        "release-please-config.json"
+      ]
+    }
+  }
+}
