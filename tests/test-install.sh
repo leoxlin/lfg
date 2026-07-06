@@ -177,18 +177,22 @@ run_install_auto_detect_case() {
   local install_dir="$tmp/lfg"
   local bin_dir="$tmp/bin"
   local output_file="$tmp/install.out"
+  local -a install_args
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
   write_fake_fzf "$bin_dir"
 
+  install_args=(--install-dir "$install_dir")
+  if [ -n "$install_shell" ]; then
+    install_args+=(--install-shell "$install_shell")
+  fi
+
   if ! HOME="$home" \
       ZDOTDIR="$zdotdir" \
       XDG_CONFIG_HOME="$xdg_config_home" \
-      LFG_INSTALL_DIR="$install_dir" \
-      INSTALL_SHELL="$install_shell" \
       SHELL="$shell_path" \
       PATH="$bin_dir:$PATH" \
-      bash "$ROOT/install.sh" > "$output_file" 2>&1; then
+      bash "$ROOT/install.sh" "${install_args[@]}" > "$output_file" 2>&1; then
     cat "$output_file" >&2 || true
     fail "install/$case_name failed"
   fi
@@ -254,17 +258,17 @@ run_install_idempotent_case() {
   local second_output="$tmp/second.out"
   local bin_dir="$tmp/bin"
   local config_file before
+  local -a install_args
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
   write_fake_fzf "$bin_dir"
+  install_args=(--install-dir "$install_dir" --install-shell "$install_shell")
 
   HOME="$home" \
     ZDOTDIR="$zdotdir" \
     XDG_CONFIG_HOME="$xdg_config_home" \
-    LFG_INSTALL_DIR="$install_dir" \
-    INSTALL_SHELL="$install_shell" \
     PATH="$bin_dir:$PATH" \
-    bash "$ROOT/install.sh" > "$first_output" 2>&1
+    bash "$ROOT/install.sh" "${install_args[@]}" > "$first_output" 2>&1
 
   case "$method" in
     zsh) config_file="$zdotdir/.zshrc" ;;
@@ -282,10 +286,8 @@ run_install_idempotent_case() {
   HOME="$home" \
     ZDOTDIR="$zdotdir" \
     XDG_CONFIG_HOME="$xdg_config_home" \
-    LFG_INSTALL_DIR="$install_dir" \
-    INSTALL_SHELL="$install_shell" \
     PATH="$bin_dir:$PATH" \
-    bash "$ROOT/install.sh" > "$second_output" 2>&1
+    bash "$ROOT/install.sh" "${install_args[@]}" > "$second_output" 2>&1
 
   case "$method" in
     zsh)
@@ -331,9 +333,11 @@ run_install_replaces_install_dir_case() {
   local stale_file="$install_dir/stale-file"
   local stale_dir="$install_dir/stale-dir"
   local installed_file
+  local -a install_args
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
   write_fake_fzf "$bin_dir"
+  install_args=(--install-dir "$install_dir" --install-shell "$install_shell")
 
   case "$method" in
     zsh)
@@ -350,10 +354,8 @@ run_install_replaces_install_dir_case() {
   HOME="$home" \
     ZDOTDIR="$zdotdir" \
     XDG_CONFIG_HOME="$xdg_config_home" \
-    LFG_INSTALL_DIR="$install_dir" \
-    INSTALL_SHELL="$install_shell" \
     PATH="$bin_dir:$PATH" \
-    bash "$ROOT/install.sh" > "$first_output" 2>&1
+    bash "$ROOT/install.sh" "${install_args[@]}" > "$first_output" 2>&1
 
   mkdir -p "$stale_dir"
   printf 'stale\n' > "$stale_file"
@@ -362,10 +364,8 @@ run_install_replaces_install_dir_case() {
   HOME="$home" \
     ZDOTDIR="$zdotdir" \
     XDG_CONFIG_HOME="$xdg_config_home" \
-    LFG_INSTALL_DIR="$install_dir" \
-    INSTALL_SHELL="$install_shell" \
     PATH="$bin_dir:$PATH" \
-    bash "$ROOT/install.sh" > "$second_output" 2>&1
+    bash "$ROOT/install.sh" "${install_args[@]}" > "$second_output" 2>&1
 
   assert_file_exists "$installed_file" "install/replaces-install-dir-$method copied script"
   assert_file_exists "$install_dir/completions/lfg.entrypoints" "install/replaces-install-dir-$method copied entrypoint completions"
@@ -400,10 +400,8 @@ run_install_source_dir_prompt_case() {
       HOME="$home" \
       ZDOTDIR="$zdotdir" \
       XDG_CONFIG_HOME="$xdg_config_home" \
-      LFG_INSTALL_DIR="$install_dir" \
-      INSTALL_SHELL=zsh \
       PATH="$bin_dir:$PATH" \
-      bash "$ROOT/install.sh" > "$output_file" 2>&1; then
+      bash "$ROOT/install.sh" --install-dir "$install_dir" --install-shell zsh > "$output_file" 2>&1; then
     cat "$output_file" >&2 || true
     fail "install/source-dir-prompt failed"
   fi
@@ -429,6 +427,7 @@ run_install_remote_release_case() {
   local curl_log="$tmp/curl.log"
   local output_file="$tmp/install.out"
   local -a env_args
+  local -a install_args
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$archive_dir"
   write_fake_release_curl "$bin_dir"
@@ -441,19 +440,18 @@ run_install_remote_release_case() {
     "HOME=$home"
     "ZDOTDIR=$zdotdir"
     "XDG_CONFIG_HOME=$xdg_config_home"
-    "LFG_INSTALL_DIR=$install_dir"
-    "INSTALL_SHELL=zsh"
     "SHELL=/bin/zsh"
     "PATH=$bin_dir:$PATH"
     "LFG_FAKE_CURL_LOG=$curl_log"
     "LFG_RELEASE_ARCHIVE_DIR=$archive_dir"
   )
+  install_args=(--install-dir "$install_dir" --install-shell zsh)
 
   if [ -n "$release_version" ]; then
-    env_args+=("LFG_RELEASE_VERSION=$release_version")
+    install_args+=(--install-version "$release_version")
   fi
 
-  if ! env "${env_args[@]}" bash -s -- < "$ROOT/install.sh" > "$output_file" 2>&1; then
+  if ! env "${env_args[@]}" bash -s -- "${install_args[@]}" < "$ROOT/install.sh" > "$output_file" 2>&1; then
     cat "$output_file" >&2 || true
     fail "install/remote-release-$case_name failed"
   fi
@@ -487,12 +485,10 @@ run_install_dependencies_brew_fzf_case() {
   if ! printf 'y\n' | HOME="$home" \
       ZDOTDIR="$zdotdir" \
       XDG_CONFIG_HOME="$xdg_config_home" \
-      LFG_INSTALL_DIR="$install_dir" \
-      INSTALL_SHELL=zsh \
       PATH="$bin_dir" \
       LFG_FAKE_BREW_LOG="$brew_log" \
       LFG_FAKE_BREW_BIN_DIR="$bin_dir" \
-      "$bash_bin" "$ROOT/install.sh" > "$output_file" 2>&1; then
+      "$bash_bin" "$ROOT/install.sh" --install-dir "$install_dir" --install-shell zsh > "$output_file" 2>&1; then
     cat "$output_file" >&2 || true
     fail "install/dependencies-brew-fzf failed"
   fi
@@ -524,10 +520,8 @@ run_install_dependencies_missing_fzf_case() {
   if HOME="$home" \
       ZDOTDIR="$zdotdir" \
       XDG_CONFIG_HOME="$xdg_config_home" \
-      LFG_INSTALL_DIR="$install_dir" \
-      INSTALL_SHELL=zsh \
       PATH="$bin_dir" \
-      "$bash_bin" "$ROOT/install.sh" > "$output_file" 2>&1; then
+      "$bash_bin" "$ROOT/install.sh" --install-dir "$install_dir" --install-shell zsh > "$output_file" 2>&1; then
     cat "$output_file" >&2 || true
     fail "install/dependencies-missing-fzf: expected missing fzf to fail"
   fi
@@ -559,12 +553,10 @@ run_install_dependencies_brew_reject_case() {
   if printf 'n\n' | HOME="$home" \
       ZDOTDIR="$zdotdir" \
       XDG_CONFIG_HOME="$xdg_config_home" \
-      LFG_INSTALL_DIR="$install_dir" \
-      INSTALL_SHELL=zsh \
       PATH="$bin_dir" \
       LFG_FAKE_BREW_LOG="$brew_log" \
       LFG_FAKE_BREW_BIN_DIR="$bin_dir" \
-      "$bash_bin" "$ROOT/install.sh" > "$output_file" 2>&1; then
+      "$bash_bin" "$ROOT/install.sh" --install-dir "$install_dir" --install-shell zsh > "$output_file" 2>&1; then
     cat "$output_file" >&2 || true
     fail "install/dependencies-brew-reject: expected rejected brew install to fail"
   fi

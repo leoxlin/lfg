@@ -688,10 +688,35 @@ set -euo pipefail
 
 : "${LFG_UPDATE_CAPTURE:?LFG_UPDATE_CAPTURE must be set}"
 
+install_shell=""
+install_dir=""
+install_version=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --install-shell)
+      install_shell="$2"
+      shift 2
+      ;;
+    --install-dir)
+      install_dir="$2"
+      shift 2
+      ;;
+    --install-version)
+      install_version="$2"
+      shift 2
+      ;;
+    *)
+      echo "unexpected installer arg: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
 {
-  printf 'install_shell=%s\n' "${INSTALL_SHELL:-}"
-  printf 'install_dir=%s\n' "${LFG_INSTALL_DIR:-}"
-  printf 'release_version=%s\n' "${LFG_RELEASE_VERSION:-}"
+  printf 'install_shell=%s\n' "$install_shell"
+  printf 'install_dir=%s\n' "$install_dir"
+  printf 'install_version=%s\n' "$install_version"
 } > "$LFG_UPDATE_CAPTURE"
 EOF
 
@@ -699,8 +724,6 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 source "$ROOT/lfg.bash"
-export LFG_INSTALL_DIR="$tmp/install-dir"
-export LFG_RELEASE_VERSION="2.0.0"
 lfg --update > "$output_file" 2> "$stderr_file"
 EOF
   chmod +x "$script"
@@ -716,8 +739,8 @@ EOF
 
   assert_file_contains "$curl_log" "https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh" "lfg/update-bash downloaded installer"
   assert_eq "$(field install_shell "$capture")" "bash" "lfg/update-bash install shell"
-  assert_eq "$(field install_dir "$capture")" "$tmp/install-dir" "lfg/update-bash install dir"
-  assert_eq "$(field release_version "$capture")" "" "lfg/update-bash lets installer choose latest release"
+  assert_eq "$(field install_dir "$capture")" "$ROOT" "lfg/update-bash install dir"
+  assert_eq "$(field install_version "$capture")" "" "lfg/update-bash lets installer choose latest release"
 
   echo "ok - lfg/update-bash"
 }

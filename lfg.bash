@@ -519,7 +519,7 @@ function _lfg_update() {
   fi
 
   install_url="https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh"
-  install_dir="${LFG_INSTALL_DIR:-$HOME/.config/lfg}"
+  install_dir="$__lfg_dir"
 
   install_script="$(mktemp "${TMPDIR:-/tmp}/lfg-install.XXXXXX")" || return 1
   if ! curl -fsSL "$install_url" -o "$install_script"; then
@@ -527,10 +527,7 @@ function _lfg_update() {
     return 1
   fi
 
-  env -u LFG_RELEASE_VERSION \
-    INSTALL_SHELL=bash \
-    LFG_INSTALL_DIR="$install_dir" \
-    bash "$install_script"
+  bash "$install_script" --install-shell bash --install-dir "$install_dir"
   update_status=$?
 
   rm -f "$install_script"

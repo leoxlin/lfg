@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LFG_INSTALL_DIR="${LFG_INSTALL_DIR:-$HOME/.config/lfg}"
-LFG_RELEASE_VERSION="${LFG_RELEASE_VERSION:-latest}"
+INSTALL_DIR="$HOME/.config/lfg"
+INSTALL_VERSION="latest"
 ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
 BASHRC="${HOME}/.bashrc"
 FISH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fish"
@@ -17,28 +17,24 @@ Usage: install.sh [OPTIONS]
 Install lfg shell integration.
 
 Options:
-  --install-dir DIR  Override install directory (default: ~/.config/lfg)
-  -h, --help         Show this help message
-
-Environment:
-  INSTALL_SHELL        Shell to configure. Accepts zsh, bash, fish, oh-my-zsh,
-                       or a shell path ending in zsh, bash, or fish. If unset,
-                       install.sh checks \$SHELL, then the shell running
-                       install.sh, then falls back to zsh.
-  LFG_INSTALL_DIR      Install directory (default: ~/.config/lfg). Replaced on
-                       every run.
-  LFG_RELEASE_VERSION  Remote install release version (default: latest). Use
-                       values like 0.1.0; tags with a leading v are accepted.
+  --install-dir DIR      Override install directory (default: ~/.config/lfg)
+  --install-shell SHELL  Shell to configure. Accepts zsh, bash, fish, oh-my-zsh,
+                         or a shell path ending in zsh, bash, or fish. If unset,
+                         install.sh checks \$SHELL, then the shell running
+                         install.sh, then falls back to zsh.
+  --install-version VER  Remote install release version (default: latest). Use
+                         values like 0.1.0; tags with a leading v are accepted.
+  -h, --help             Show this help message
 
 Remote install:
   curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
-  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL=fish bash
-  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | LFG_RELEASE_VERSION=0.1.0 bash
+  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash -s -- --install-shell fish
+  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash -s -- --install-version 0.1.0
 
 Local install:
   ./install.sh
   ./install.sh --install-dir ~/.local/share/lfg
-  INSTALL_SHELL=oh-my-zsh ./install.sh
+  ./install.sh --install-shell oh-my-zsh
 
 The remote installer downloads the latest GitHub release archive by default.
 Remote installs only support github.com/leoxlin/lfg.
@@ -102,8 +98,8 @@ extract_release_archive() {
 }
 
 reset_install_dir() {
-  rm -rf "$LFG_INSTALL_DIR"
-  mkdir -p "$LFG_INSTALL_DIR"
+  rm -rf "$INSTALL_DIR"
+  mkdir -p "$INSTALL_DIR"
 }
 
 # Fetch the repo files when running remotely.
@@ -112,17 +108,17 @@ fetch_repo() {
     return 0
   fi
 
-  local repo_dir="$LFG_INSTALL_DIR/repo"
+  local repo_dir="$INSTALL_DIR/repo"
   rm -rf "$repo_dir"
   mkdir -p "$repo_dir"
 
   local release_tag asset_version release_url archive_file extract_dir
 
-  release_tag="$(release_tag_for_version "$LFG_RELEASE_VERSION")"
+  release_tag="$(release_tag_for_version "$INSTALL_VERSION")"
   asset_version="${release_tag#v}"
   release_url="https://github.com/leoxlin/lfg/releases/download/$release_tag/lfg-$asset_version.tar.gz"
-  archive_file="$LFG_INSTALL_DIR/lfg-$asset_version.tar.gz"
-  extract_dir="$LFG_INSTALL_DIR/release"
+  archive_file="$INSTALL_DIR/lfg-$asset_version.tar.gz"
+  extract_dir="$INSTALL_DIR/release"
 
   echo "Downloading $release_url"
   download_file "$release_url" "$archive_file"
@@ -294,14 +290,14 @@ install_source_shell() {
   local config_file="$3"
 
   echo "Installing lfg for $shell_name"
-  mkdir -p "$LFG_INSTALL_DIR/completions"
-  cp -f "$REPO_ROOT/$script_name" "$LFG_INSTALL_DIR/$script_name"
-  cp -f "$REPO_ROOT/completions/lfg.entrypoints" "$LFG_INSTALL_DIR/completions/lfg.entrypoints"
+  mkdir -p "$INSTALL_DIR/completions"
+  cp -f "$REPO_ROOT/$script_name" "$INSTALL_DIR/$script_name"
+  cp -f "$REPO_ROOT/completions/lfg.entrypoints" "$INSTALL_DIR/completions/lfg.entrypoints"
   maybe_add_lfg_source_dir_to_file "$config_file"
   if shell_has_lfg "$shell_name"; then
     echo "lfg is already installed for $shell_name; skipping ${config_file##*/} update"
   else
-    add_source_block_to_file "source \"$LFG_INSTALL_DIR/$script_name\"" "$config_file"
+    add_source_block_to_file "source \"$INSTALL_DIR/$script_name\"" "$config_file"
   fi
 }
 
@@ -331,11 +327,35 @@ install_oh_my_zsh() {
 
 METHOD="auto"
 
+require_option_value() {
+  local option="$1"
+  local value="${2:-}"
+
+  if [ -z "$value" ]; then
+    echo "error: $option requires a value" >&2
+    exit 1
+  fi
+}
+
 parse_args() {
   while [ $# -gt 0 ]; do
     case "$1" in
       --install-dir)
-        LFG_INSTALL_DIR="$2"
+        require_option_value "$1" "${2:-}"
+        INSTALL_DIR="$2"
+        shift
+        ;;
+      --install-shell)
+        require_option_value "$1" "${2:-}"
+        if ! METHOD="$(install_method_from_value "$2")"; then
+          echo "error: --install-shell must be zsh, bash, fish, oh-my-zsh, or a path ending in zsh, bash, or fish." >&2
+          exit 1
+        fi
+        shift
+        ;;
+      --install-version)
+        require_option_value "$1" "${2:-}"
+        INSTALL_VERSION="$2"
         shift
         ;;
       -h|--help)
@@ -354,16 +374,6 @@ parse_args() {
 
 detect_shell() {
   local shell_name
-
-  if [ -n "${INSTALL_SHELL:-}" ]; then
-    if shell_name="$(install_method_from_value "$INSTALL_SHELL")"; then
-      echo "$shell_name"
-      return 0
-    fi
-
-    echo "error: INSTALL_SHELL must be zsh, bash, fish, oh-my-zsh, or a path ending in zsh, bash, or fish." >&2
-    exit 1
-  fi
 
   if [ -n "${SHELL:-}" ] && shell_name="$(install_method_from_value "$SHELL")"; then
     echo "$shell_name"

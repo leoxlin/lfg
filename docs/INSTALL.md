@@ -22,8 +22,8 @@ curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
 ```
 
 Remote installs download the latest GitHub release archive by default. To
-install a specific release or configure a specific shell, use the environment
-variables documented by `install.sh --help`.
+install a specific release or configure a specific shell, use the options
+documented by `install.sh --help`.
 
 ## Local Install
 
@@ -36,7 +36,7 @@ cd lfg-repo
 ```
 
 The installer auto-detects the current shell unless a shell override is passed
-with an environment variable documented by `install.sh --help`.
+with `--install-shell`.
 
 ## Re-running the Installer
 

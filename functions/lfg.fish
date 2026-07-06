@@ -37,9 +37,6 @@ function _lfg_update
     set -l install_url https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh
 
     set -l install_dir "$HOME/.config/lfg"
-    if set -q LFG_INSTALL_DIR
-        set install_dir "$LFG_INSTALL_DIR"
-    end
 
     set -l tmpdir /tmp
     if set -q TMPDIR
@@ -54,10 +51,7 @@ function _lfg_update
         return 1
     end
 
-    env -u LFG_RELEASE_VERSION \
-        INSTALL_SHELL=fish \
-        LFG_INSTALL_DIR="$install_dir" \
-        bash "$install_script"
+    bash "$install_script" --install-shell fish --install-dir "$install_dir"
     set -l update_status $status
 
     rm -f "$install_script"
