@@ -238,6 +238,60 @@ run_install_idempotent_case() {
   echo "ok - install/idempotent-$method"
 }
 
+run_install_replaces_install_dir_case() {
+  local method="$1"
+  local install_shell="$2"
+  local tmp="$tmp_root/install-replaces-install-dir-$method"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local first_output="$tmp/first.out"
+  local second_output="$tmp/second.out"
+  local stale_file="$install_dir/stale-file"
+  local stale_dir="$install_dir/stale-dir"
+  local installed_file
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home"
+
+  case "$method" in
+    zsh)
+      installed_file="$install_dir/lfg.zsh"
+      ;;
+    bash)
+      installed_file="$install_dir/lfg.bash"
+      ;;
+    *)
+      fail "install/replaces-install-dir-$method: unknown method"
+      ;;
+  esac
+
+  HOME="$home" \
+    ZDOTDIR="$zdotdir" \
+    XDG_CONFIG_HOME="$xdg_config_home" \
+    LFG_INSTALL_DIR="$install_dir" \
+    INSTALL_SHELL="$install_shell" \
+    bash "$ROOT/install.sh" > "$first_output" 2>&1
+
+  mkdir -p "$stale_dir"
+  printf 'stale\n' > "$stale_file"
+  printf 'stale\n' > "$stale_dir/old"
+
+  HOME="$home" \
+    ZDOTDIR="$zdotdir" \
+    XDG_CONFIG_HOME="$xdg_config_home" \
+    LFG_INSTALL_DIR="$install_dir" \
+    INSTALL_SHELL="$install_shell" \
+    bash "$ROOT/install.sh" > "$second_output" 2>&1
+
+  assert_file_exists "$installed_file" "install/replaces-install-dir-$method copied script"
+  if [ -e "$stale_file" ] || [ -e "$stale_dir" ]; then
+    fail "install/replaces-install-dir-$method: expected stale install dir contents to be removed"
+  fi
+
+  echo "ok - install/replaces-install-dir-$method"
+}
+
 run_install_cases() {
   local removed_arg
 
@@ -249,6 +303,9 @@ run_install_cases() {
   run_install_idempotent_case "bash" "bash"
   run_install_idempotent_case "fish" "fish"
   run_install_idempotent_case "oh-my-zsh" "oh-my-zsh"
+
+  run_install_replaces_install_dir_case "zsh" "zsh"
+  run_install_replaces_install_dir_case "bash" "bash"
 
   for removed_arg in --zsh --bash --fish --oh-my-zsh; do
     run_install_rejects_args_case "$removed_arg"

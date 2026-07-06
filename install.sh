@@ -3,6 +3,7 @@ set -euo pipefail
 
 LFG_INSTALL_DIR="${LFG_INSTALL_DIR:-$HOME/.config/lfg}"
 LFG_REPO_URL="${LFG_REPO_URL:-https://github.com/leoxlin/lfg.git}"
+LFG_REPO_REF="${LFG_REPO_REF:-main}"
 ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
 BASHRC="${HOME}/.bashrc"
 FISH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fish"
@@ -20,6 +21,8 @@ Options:
   --install-dir   Override install directory (default: ~/.config/lfg)
   --repo-url      Override git repo URL for remote installs
                   (default: ${LFG_REPO_URL})
+  --repo-ref      Override git ref (branch/tag) for remote installs
+                  (default: ${LFG_REPO_REF})
   -h, --help      Show this help message
 
 The current shell is auto-detected.
@@ -30,9 +33,10 @@ Remote install:
   curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | INSTALL_SHELL="$SHELL" bash
   curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | INSTALL_SHELL=fish bash
 
-The remote installer clones the repository into ~/.config/lfg/repo and
-installs from there. Override the URL with the LFG_REPO_URL environment
-variable or the --repo-url option.
+The remote installer downloads the files from the repository into
+~/.config/lfg/repo and installs from there. Override the URL or ref with
+the LFG_REPO_URL / LFG_REPO_REF environment variables or the --repo-url
+/ --repo-ref options.
 EOF
 }
 
@@ -46,7 +50,44 @@ detect_source() {
   fi
 }
 
-# Fetch the repo when running remotely.
+# Convert a GitHub repo URL into a raw.githubusercontent.com base URL.
+# Supports https://github.com/owner/repo.git and git@github.com:owner/repo.git.
+github_raw_base() {
+  local url="$1"
+  local ref="$2"
+  local owner path repo
+
+  if [[ "$url" =~ ^https://github\.com/([^/]+)/(.+)$ ]]; then
+    owner="${BASH_REMATCH[1]}"
+    path="${BASH_REMATCH[2]}"
+  elif [[ "$url" =~ ^git@github\.com:([^/]+)/(.+)$ ]]; then
+    owner="${BASH_REMATCH[1]}"
+    path="${BASH_REMATCH[2]}"
+  else
+    return 1
+  fi
+
+  repo="${path%.git}"
+  echo "https://raw.githubusercontent.com/$owner/$repo/$ref"
+}
+
+# Download a single file when running remotely.
+download_file() {
+  local url="$1"
+  local dest="$2"
+
+  if ! curl -fsSL "$url" -o "$dest"; then
+    echo "error: failed to download $url" >&2
+    exit 1
+  fi
+}
+
+reset_install_dir() {
+  rm -rf "$LFG_INSTALL_DIR"
+  mkdir -p "$LFG_INSTALL_DIR"
+}
+
+# Fetch the repo files when running remotely.
 fetch_repo() {
   if [ "$IS_LOCAL" = true ]; then
     return 0
@@ -59,9 +100,24 @@ fetch_repo() {
   fi
 
   local repo_dir="$LFG_INSTALL_DIR/repo"
-  echo "Cloning $LFG_REPO_URL"
   rm -rf "$repo_dir"
-  git clone --depth 1 "$LFG_REPO_URL" "$repo_dir"
+  mkdir -p "$repo_dir/functions" "$repo_dir/completions"
+
+  local raw_base
+  if raw_base="$(github_raw_base "$LFG_REPO_URL" "$LFG_REPO_REF")"; then
+    echo "Downloading files from $raw_base"
+    download_file "$raw_base/lfg.zsh" "$repo_dir/lfg.zsh"
+    download_file "$raw_base/lfg.bash" "$repo_dir/lfg.bash"
+    download_file "$raw_base/lfg.plugin.zsh" "$repo_dir/lfg.plugin.zsh"
+    download_file "$raw_base/functions/lfg.fish" "$repo_dir/functions/lfg.fish"
+    download_file "$raw_base/functions/worktree.fish" "$repo_dir/functions/worktree.fish"
+    download_file "$raw_base/completions/lfg.fish" "$repo_dir/completions/lfg.fish"
+    download_file "$raw_base/completions/worktree.fish" "$repo_dir/completions/worktree.fish"
+  else
+    echo "Cloning $LFG_REPO_URL"
+    git clone --depth 1 "$LFG_REPO_URL" "$repo_dir"
+  fi
+
   REPO_ROOT="$repo_dir"
 }
 
@@ -103,7 +159,7 @@ shell_has_lfg() {
 install_zsh() {
   echo "Installing lfg for zsh"
   mkdir -p "$LFG_INSTALL_DIR"
-  ln -sf "$REPO_ROOT/lfg.zsh" "$LFG_INSTALL_DIR/lfg.zsh"
+  cp -f "$REPO_ROOT/lfg.zsh" "$LFG_INSTALL_DIR/lfg.zsh"
   if shell_has_lfg zsh; then
     echo "lfg is already installed for zsh; skipping .zshrc update"
   else
@@ -114,7 +170,7 @@ install_zsh() {
 install_bash() {
   echo "Installing lfg for bash"
   mkdir -p "$LFG_INSTALL_DIR"
-  ln -sf "$REPO_ROOT/lfg.bash" "$LFG_INSTALL_DIR/lfg.bash"
+  cp -f "$REPO_ROOT/lfg.bash" "$LFG_INSTALL_DIR/lfg.bash"
   if shell_has_lfg bash; then
     echo "lfg is already installed for bash; skipping .bashrc update"
   else
@@ -155,6 +211,10 @@ parse_args() {
         ;;
       --repo-url)
         LFG_REPO_URL="$2"
+        shift
+        ;;
+      --repo-ref)
+        LFG_REPO_REF="$2"
         shift
         ;;
       -h|--help)
@@ -215,6 +275,7 @@ install_method_from_value() {
 main() {
   parse_args "$@"
   detect_source
+  reset_install_dir
   fetch_repo
 
   if [ "$METHOD" = "auto" ]; then

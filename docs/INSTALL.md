@@ -26,7 +26,7 @@ curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTAL
 
 ## Local Install
 
-Clone the repository and run the installer:
+Run the installer from a local clone:
 
 ```bash
 git clone https://github.com/leoxlin/lfg.git ~/.config/lfg-repo
@@ -46,14 +46,18 @@ INSTALL_SHELL=oh-my-zsh ./install.sh # install as an Oh My Zsh plugin
 
 ## Re-running the Installer
 
-The installer is idempotent. Before modifying any shell configuration, it runs
-the target shell and checks whether `lfg` is already available. If it is, the
-installer prints a message and does not modify your shell configuration files
-again. To force a fresh install, remove the existing installation first.
+The installer replaces `LFG_INSTALL_DIR` on every run before downloading or
+copying files, so stale files under `~/.config/lfg` do not survive reinstalling.
+
+Shell configuration updates remain idempotent. Before modifying any shell
+configuration, the installer runs the target shell and checks whether `lfg` is
+already available. If it is, the installer prints a message and does not modify
+your shell configuration files again.
 
 ## Remote Install
 
-`install.sh` can be piped from a URL. It clones the repository into `~/.config/lfg/repo` and installs from there.
+`install.sh` can be piped from a URL. It downloads the files from the repository
+into `~/.config/lfg/repo` and installs from there.
 
 Auto-detection order is:
 
@@ -62,7 +66,8 @@ Auto-detection order is:
 3. the shell running `install.sh`,
 4. zsh as a final fallback.
 
-Override the repository URL with `LFG_REPO_URL` or `--repo-url`:
+Override the repository URL or ref with `LFG_REPO_URL` / `LFG_REPO_REF` or
+`--repo-url` / `--repo-ref`:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh \
@@ -70,6 +75,9 @@ curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh \
 
 curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh \
   | bash -s -- --repo-url https://github.com/leoxlin/lfg.git
+
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh \
+  | bash -s -- --repo-ref main
 ```
 
 ## Oh My Zsh Plugin
