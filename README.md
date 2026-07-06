@@ -2,12 +2,6 @@
 
 Jump into a git worktree and start a coding agent.
 
-## Docs
-
-- [Install](docs/INSTALL.md)
-- [Usage](docs/USAGE.md)
-- [Release](docs/RELEASE.md)
-
 ## Quick Start
 
 1. Install dependencies
@@ -28,3 +22,9 @@ Jump into a git worktree and start a coding agent.
    ```
 
 See [Usage](docs/USAGE.md) for command behavior and environment variables.
+
+## Docs
+
+- [Install](docs/INSTALL.md)
+- [Usage](docs/USAGE.md)
+- [Release](docs/RELEASE.md)
