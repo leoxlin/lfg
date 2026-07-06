@@ -81,6 +81,8 @@ for file in "${release_files[@]}"; do
   cp -p "$ROOT/$file" "$stage_dir/$file"
 done
 
+printf '%s\n' "$version" > "$stage_dir/VERSION"
+
 rm -f "$archive_file"
 
 if command -v tar >/dev/null 2>&1; then

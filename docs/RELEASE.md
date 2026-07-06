@@ -21,6 +21,7 @@ Release bumps are based on Conventional Commits:
 
 When a GitHub release is created, the workflow runs `scripts/release.sh` with
 the released version and uploads `dist/lfg-<version>.tar.gz` to that release.
+The archive includes a `VERSION` file containing the released version string.
 It also updates a `latest` tag/release and uploads `dist/lfg-latest.tar.gz`
 there, so the remote installer can install the latest release without querying
 the GitHub API.
