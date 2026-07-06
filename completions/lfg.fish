@@ -2,7 +2,7 @@
 
 complete -c lfg -f
 
-complete -c lfg -n '__fish_is_first_token' -a 'update' -d 'update lfg'
+complete -c lfg -n '__fish_is_first_token' -a '--update' -d 'update lfg'
 complete -c lfg -n '__fish_is_first_token' -a 'claude' -d 'launch claude'
 complete -c lfg -n '__fish_is_first_token' -a 'antigravity' -d 'launch antigravity'
 complete -c lfg -n '__fish_is_first_token' -a 'codex' -d 'launch codex'
@@ -13,5 +13,3 @@ complete -c lfg -n '__fish_is_first_token' -a 'opencode' -d 'launch opencode'
 complete -c lfg -n '__fish_is_first_token' -a 'pi' -d 'launch pi'
 complete -c lfg -n '__fish_is_first_token' -a 'aider' -d 'launch aider'
 complete -c lfg -n '__fish_is_first_token' -a 'gemini' -d 'launch gemini'
-
-complete -c lfg -n '__fish_seen_subcommand_from claude antigravity codex cursor kimi kimi-code opencode pi aider gemini' -a '(git for-each-ref --format="%(refname:short)" refs/heads 2>/dev/null)'

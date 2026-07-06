@@ -1,16 +1,15 @@
 # lfg: jump into a worktree and start an agent.
 # Release version: 0.2.0 # x-release-please-version
 #
-# Usage: lfg [entrypoint] [branch_name]
+# Usage: lfg [entrypoint]
 #
 # - entrypoint: the command to run once inside the worktree (default: claude).
 #     lfg               -> claude in a picked branch
 #     lfg codex         -> codex in a picked branch
-#     lfg claude feat/x -> claude in worktree for branch feat/x
-#     lfg update        -> download and install the latest lfg release
+#     lfg --update      -> download and install the latest lfg release
 # - Outside a git repo: pick one from $LFG_SOURCE_DIR via fzf (type to filter).
-# - With no branch: pick an existing worktree branch, or type a new name to
-#   create one.
+# - When not already inside a linked worktree: pick an existing worktree branch,
+#   or type a new name to create one.
 # - Creates/switches the worktree (under $LFG_SOURCE_DIR/.agents/worktrees, via
 #   the worktree helper) and launches the entrypoint there. LFG_SOURCE_DIR
 #   defaults to ~/src if unset.
@@ -523,23 +522,33 @@ function _lfg_update() {
   return "$update_status"
 }
 
+function _lfg_usage() {
+  echo "usage: lfg [entrypoint]"
+  echo "       lfg --update"
+}
+
 function lfg() {
   local entrypoint branch repo
 
-  if [ "${1:-}" = "update" ]; then
+  if [ "$#" -gt 1 ]; then
+    _lfg_usage >&2
+    return 1
+  fi
+
+  if [ "${1:-}" = "--update" ]; then
     _lfg_update
     return
   fi
 
   entrypoint="${1:-${LFG_DEFAULT_AGENT_COMMAND:-claude}}"
-  branch="$2"
+  branch=""
 
   if ! command -v "$entrypoint" >/dev/null 2>&1; then
     echo "lfg: entrypoint not found on PATH: $entrypoint" >&2
     return 1
   fi
 
-  # Already in a worktree with no branch requested: just launch here.
+  # Already in a worktree: just launch here.
   if [ -z "$branch" ] && _lfg_in_worktree; then
     "$entrypoint"
     return
@@ -562,7 +571,7 @@ function lfg() {
 function _lfg_complete() {
   case "$CURRENT" in
     2) _values 'entrypoint' \
-      'update' \
+      '--update' \
       'claude' \
       'antigravity' \
       'codex' \
@@ -573,7 +582,6 @@ function _lfg_complete() {
       'pi' \
       'aider' \
       'gemini' ;;
-    3) _worktree_branches ;;
   esac
 }
 

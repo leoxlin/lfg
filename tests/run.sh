@@ -471,7 +471,7 @@ shell_script_for() {
   local shell_name="$1"
   local script="$2"
   local start_dir="$3"
-  local branch_arg="$4"
+  local lfg_args="$4"
   local output_file="$5"
   local stderr_file="$6"
 
@@ -482,7 +482,7 @@ shell_script_for() {
 set -o pipefail
 source "$ROOT/lfg.bash" || exit 1
 cd "$start_dir" || exit 1
-lfg fake-agent $branch_arg > "$output_file" 2> "$stderr_file"
+lfg fake-agent $lfg_args > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     zsh)
@@ -492,7 +492,7 @@ emulate -R zsh
 set -o pipefail
 source "$ROOT/lfg.zsh" || exit 1
 cd "$start_dir" || exit 1
-lfg fake-agent $branch_arg > "$output_file" 2> "$stderr_file"
+lfg fake-agent $lfg_args > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     fish)
@@ -502,7 +502,7 @@ source "$ROOT/functions/lfg.fish"
 or exit 1
 cd "$start_dir"
 or exit 1
-lfg fake-agent $branch_arg > "$output_file" 2> "$stderr_file"
+lfg fake-agent $lfg_args > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     *)
@@ -539,7 +539,7 @@ run_case() {
   local output_file="$tmp/agent.out"
   local stderr_file="$tmp/lfg.err"
   local script="$tmp/case.$shell_name"
-  local start_dir branch expected_pwd expected_branch expected_is_worktree branch_arg fzf_code
+  local start_dir branch expected_pwd expected_branch expected_is_worktree lfg_args fzf_code
 
   mkdir -p "$bin_dir"
   write_fake_fzf "$bin_dir"
@@ -575,22 +575,25 @@ run_case() {
       expected_is_worktree="true"
       fzf_code="0"
       ;;
+    current)
+      branch="feat/start"
+      expected_pwd="$source_dir/.agents/worktrees/repo-feat-start"
+      expected_branch="feat/start"
+      expected_is_worktree="true"
+      fzf_code="0"
+      ;;
     *) fail "$shell_name/$context/$target: unknown target" ;;
   esac
 
   : > "$responses"
-  branch_arg=""
+  lfg_args=""
   if [ "$context" = "outside" ]; then
     printf '0|%s\n%s|%s\n' "$repo" "$fzf_code" "$branch" > "$responses"
   elif [ "$context" = "repo" ]; then
     printf '%s|%s\n' "$fzf_code" "$branch" > "$responses"
-  else
-    # Documented behavior launches in-place from a worktree when no branch is
-    # provided, so branch-routing cases from a worktree must request a branch.
-    branch_arg="$branch"
   fi
 
-  shell_script_for "$shell_name" "$script" "$start_dir" "$branch_arg" "$output_file" "$stderr_file"
+  shell_script_for "$shell_name" "$script" "$start_dir" "$lfg_args" "$output_file" "$stderr_file"
 
   if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
       LFG_SOURCE_DIR="$source_dir" \
@@ -614,18 +617,19 @@ run_case() {
 run_shell_cases() {
   local shell_name="$1"
   local shell_bin="$2"
-  local context target
+  local target
 
   if ! command -v "$shell_bin" >/dev/null 2>&1; then
     echo "skip - $shell_name not found"
     return 0
   fi
 
-  for context in outside repo worktree; do
-    for target in main new existing; do
-      run_case "$shell_name" "$shell_bin" "$context" "$target"
-    done
+  for target in main new existing; do
+    run_case "$shell_name" "$shell_bin" "outside" "$target"
+    run_case "$shell_name" "$shell_bin" "repo" "$target"
   done
+
+  run_case "$shell_name" "$shell_bin" "worktree" "current"
 }
 
 run_worktree_setup_hook_case() {
@@ -742,7 +746,7 @@ set -euo pipefail
 source "$ROOT/lfg.bash"
 export LFG_INSTALL_DIR="$tmp/install-dir"
 export LFG_RELEASE_VERSION="2.0.0"
-lfg update > "$output_file" 2> "$stderr_file"
+lfg --update > "$output_file" 2> "$stderr_file"
 EOF
   chmod +x "$script"
 

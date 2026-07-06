@@ -26,6 +26,5 @@ Examples:
 
 - `lfg` - launch the default agent in a picked branch.
 - `lfg codex` - launch `codex` in a picked branch.
-- `lfg claude feat/x` - launch `claude` in a worktree for branch `feat/x`.
 
 See [Usage](docs/USAGE.md) for command behavior and environment variables.
