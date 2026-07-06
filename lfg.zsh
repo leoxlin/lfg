@@ -234,13 +234,26 @@ function _worktree_fzf() {
 }
 
 function _worktree_pick_repo() {
-  local out code repo_name
+  local sources_dir repos out code repo_name
 
-  out="$(find "$(_worktree_sources_dir)" -mindepth 1 -maxdepth 1 -type d \
+  sources_dir="$(_worktree_sources_dir)"
+  if [ ! -d "$sources_dir" ]; then
+    echo "lfg: no source directory found at $sources_dir" >&2
+    echo "Set LFG_SOURCE_DIR to the folder that contains your cloned git repositories." >&2
+    return 1
+  fi
+
+  repos="$(find "$sources_dir" -mindepth 1 -maxdepth 1 -type d \
       -exec test -e '{}/.git' ';' -print 2>/dev/null \
     | while IFS= read -r repo; do basename "$repo"; done \
-    | sort \
-    | _worktree_fzf ' Select a repo ' 'repo> ')"
+    | sort)"
+  if [ -z "$repos" ]; then
+    echo "lfg: no git repositories found under $sources_dir" >&2
+    echo "Set LFG_SOURCE_DIR to the folder that contains your cloned git repositories." >&2
+    return 1
+  fi
+
+  out="$(printf '%s\n' "$repos" | _worktree_fzf ' Select a repo ' 'repo> ')"
   code=$?
   [ "$code" -eq 0 ] || return 1
 

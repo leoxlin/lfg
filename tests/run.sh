@@ -666,6 +666,42 @@ run_fzf_pointer_color_case() {
   done
 }
 
+run_source_dir_requires_repo_case() {
+  local shell_name="$1"
+  local shell_bin="$2"
+  local tmp="$tmp_root/source-dir-requires-repo-$shell_name"
+  local source_dir="$tmp/src"
+  local start_dir="$tmp/outside"
+  local bin_dir="$tmp/bin"
+  local output_file="$tmp/agent.out"
+  local stderr_file="$tmp/lfg.err"
+  local script="$tmp/case.$shell_name"
+
+  if ! command -v "$shell_bin" >/dev/null 2>&1; then
+    echo "skip - source-dir-requires-repo/$shell_name not found"
+    return 0
+  fi
+
+  mkdir -p "$source_dir" "$start_dir" "$bin_dir"
+  write_fake_fzf "$bin_dir"
+  shell_script_for "$shell_name" "$script" "$start_dir" "" "$output_file" "$stderr_file"
+
+  if PATH="$bin_dir:$ROOT/tests:$PATH" \
+      LFG_SOURCE_DIR="$source_dir" \
+      run_shell_script "$shell_name" "$shell_bin" "$script"; then
+    echo "stdout:" >&2
+    cat "$output_file" >&2 || true
+    echo "stderr:" >&2
+    cat "$stderr_file" >&2 || true
+    fail "source-dir-requires-repo/$shell_name unexpectedly succeeded"
+  fi
+
+  assert_file_contains "$stderr_file" "lfg: no git repositories found under $source_dir" "source-dir-requires-repo/$shell_name stderr"
+  assert_file_contains "$stderr_file" "Set LFG_SOURCE_DIR to the folder that contains your cloned git repositories." "source-dir-requires-repo/$shell_name guidance"
+
+  echo "ok - source-dir-requires-repo/$shell_name"
+}
+
 run_case() {
   local shell_name="$1"
   local shell_bin="$2"
@@ -1049,6 +1085,10 @@ run_lfg_help_case "fish" "fish"
 run_fzf_pointer_color_case "bash" "bash"
 run_fzf_pointer_color_case "zsh" "zsh"
 run_fzf_pointer_color_case "fish" "fish"
+
+run_source_dir_requires_repo_case "bash" "bash"
+run_source_dir_requires_repo_case "zsh" "zsh"
+run_source_dir_requires_repo_case "fish" "fish"
 
 run_lfg_completion_file_case "bash" "bash"
 run_lfg_completion_file_case "zsh" "zsh"

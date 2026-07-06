@@ -177,13 +177,26 @@ function _worktree_fzf
 end
 
 function _worktree_pick_repo
-    set -l out (find "$(_worktree_sources_dir)" -mindepth 1 -maxdepth 1 -type d \
+    set -l sources_dir (_worktree_sources_dir)
+    if not test -d "$sources_dir"
+        echo "lfg: no source directory found at $sources_dir" >&2
+        echo "Set LFG_SOURCE_DIR to the folder that contains your cloned git repositories." >&2
+        return 1
+    end
+
+    set -l repos (find "$sources_dir" -mindepth 1 -maxdepth 1 -type d \
         -exec test -e '{}/.git' ';' -print 2>/dev/null \
         | while read -l repo
             basename "$repo"
         end \
-        | sort \
-        | _worktree_fzf ' Select a repo ' 'repo> ')
+        | sort)
+    if test (count $repos) -eq 0
+        echo "lfg: no git repositories found under $sources_dir" >&2
+        echo "Set LFG_SOURCE_DIR to the folder that contains your cloned git repositories." >&2
+        return 1
+    end
+
+    set -l out (printf '%s\n' $repos | _worktree_fzf ' Select a repo ' 'repo> ')
     set -l code $status
     if test $code -ne 0
         return 1
@@ -221,7 +234,8 @@ function _worktree_interactive_cd
     end
 
     if not git rev-parse --is-inside-work-tree >/dev/null 2>&1
-        set -l repo (_worktree_pick_repo)
+        set -l repo
+        _worktree_pick_repo | read -l repo
         or return 1
         cd "$repo"
         or return 1

@@ -18,6 +18,7 @@ Examples:
 ## Behavior
 
 - Outside a git repo, `lfg` asks you to pick one from `$LFG_SOURCE_DIR` with `fzf`; the selector uses a rounded border labeled `Select a repo` around the `repo> ` prompt.
+- Outside a git repo, `$LFG_SOURCE_DIR` should point to the folder that contains your cloned git repositories; it must exist and contain at least one immediate child repo with `.git`.
 - When not already inside a linked worktree, `lfg` asks you to pick an existing worktree branch or type a new branch name to create one; the selector uses a rounded border labeled `Select or create worktree branch` around the `worktree> ` prompt.
 - `lfg` appends `--color=pointer:<pointer-color>` to `FZF_DEFAULT_OPTS` for its `fzf` selectors so the selection pointer is colored by `LFG_FZF_POINTER_COLOR`.
 - If already inside a linked worktree, `lfg` launches the agent in the current directory.

@@ -115,7 +115,8 @@ function lfg
     end
 
     if not git rev-parse --is-inside-work-tree >/dev/null 2>&1
-        set -l repo (_worktree_pick_repo)
+        set -l repo
+        _worktree_pick_repo | read -l repo
         or return 1
         cd "$repo"
         or return 1
