@@ -320,7 +320,7 @@ function _worktree_prune_days
     if set -q LFG_PRUNE_OLDER_THAN_DAYS
         echo $LFG_PRUNE_OLDER_THAN_DAYS
     else
-        echo 1
+        echo 7
     end
 end
 

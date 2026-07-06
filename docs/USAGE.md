@@ -55,7 +55,7 @@ worktree remove|rm <branch_name> # remove a worktree
 `worktree prune` removes worktrees that are:
 
 - missing their directory,
-- older than `${LFG_PRUNE_OLDER_THAN_DAYS:-1}` day(s), or
+- older than `${LFG_PRUNE_OLDER_THAN_DAYS:-7}` day(s), or
 - not backed by a remote branch.
 
 After removals, it runs `git worktree prune` from the main checkout.
@@ -96,7 +96,7 @@ Configure `lfg` with environment variables.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LFG_DEFAULT_AGENT_COMMAND` | `claude` | Agent launched by `lfg` when no entrypoint is given. |
-| `LFG_PRUNE_OLDER_THAN_DAYS` | `1` | Worktrees older than this many days are pruned. |
+| `LFG_PRUNE_OLDER_THAN_DAYS` | `7` | Worktrees older than this many days are pruned. |
 | `LFG_FZF_HIGHLIGHT_COLOR` | `green` | Highlight color passed to `fzf`. |
 | `LFG_SOURCE_DIR` | `~/src` | Root directory scanned for repos when `lfg` is run outside a git repo. |
 | `LFG_COMPLETIONS_FILE` | bundled `completions/lfg.entrypoints` | Newline-delimited file of `lfg` entrypoint completion suggestions. Blank lines and lines starting with `#` are ignored. |

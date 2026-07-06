@@ -145,7 +145,7 @@ function _worktree_is_older_than_days() {
 }
 
 function _worktree_prune_days() {
-  echo "${LFG_PRUNE_OLDER_THAN_DAYS:-1}"
+  echo "${LFG_PRUNE_OLDER_THAN_DAYS:-7}"
 }
 
 function _worktree_prune_reason() {
