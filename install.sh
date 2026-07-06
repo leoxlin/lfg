@@ -10,6 +10,18 @@ FISH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fish"
 REPO_ROOT=""
 IS_LOCAL=false
 
+#######################################
+# Logging helper
+#######################################
+logger() {
+  local level="$1"
+  shift
+  printf '[%s] [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$*" >&2
+}
+
+#######################################
+# Usage and argument parsing
+#######################################
 usage() {
   cat <<EOF
 Usage: install.sh [OPTIONS]
@@ -28,27 +40,72 @@ Options:
 EOF
 }
 
-# Detect whether the script is being run from a local file or via curl/pipe.
+require_option_value() {
+  local option="$1"
+  local value="${2:-}"
+
+  if [ -z "$value" ]; then
+    logger "ERROR" "$option requires a value"
+    exit 1
+  fi
+}
+
+parse_args() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --install-dir)
+        require_option_value "$1" "${2:-}"
+        INSTALL_DIR="$2"
+        logger "INFO" "Install directory set to: $INSTALL_DIR"
+        shift
+        ;;
+      --install-shell)
+        require_option_value "$1" "${2:-}"
+        if ! METHOD="$(install_method_from_value "$2")"; then
+          logger "ERROR" "--install-shell must be zsh, bash, fish, oh-my-zsh, or a path ending in zsh, bash, or fish."
+          exit 1
+        fi
+        logger "INFO" "Install shell/method set to: $METHOD"
+        shift
+        ;;
+      --install-version)
+        require_option_value "$1" "${2:-}"
+        INSTALL_VERSION="$2"
+        logger "INFO" "Install version set to: $INSTALL_VERSION"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        logger "ERROR" "Unknown option: $1"
+        usage >&2
+        exit 1
+        ;;
+    esac
+    shift
+  done
+}
+
+#######################################
+# Source detection
+#######################################
 detect_source() {
   local script_path="${BASH_SOURCE[0]:-}"
 
   if [ -n "$script_path" ] && [ -f "$script_path" ]; then
     IS_LOCAL=true
     REPO_ROOT="$(cd "$(dirname "$script_path")" && pwd)"
+    logger "INFO" "Running from local repository: $REPO_ROOT"
+  else
+    logger "INFO" "Running via remote curl/pipe install"
   fi
 }
 
-# Download a single file when running remotely.
-download_file() {
-  local url="$1"
-  local dest="$2"
-
-  if ! curl -fsSL "$url" -o "$dest"; then
-    echo "error: failed to download $url" >&2
-    exit 1
-  fi
-}
-
+#######################################
+# Release download and extraction
+#######################################
 release_tag_for_version() {
   local version="$1"
 
@@ -61,15 +118,29 @@ release_tag_for_version() {
   fi
 }
 
+# Download a single file when running remotely.
+download_file() {
+  local url="$1"
+  local dest="$2"
+
+  logger "INFO" "Downloading: $url"
+  if ! curl -fsSL "$url" -o "$dest"; then
+    logger "ERROR" "Failed to download $url"
+    exit 1
+  fi
+  logger "INFO" "Downloaded to: $dest"
+}
+
 extract_release_archive() {
   local archive_file="$1"
   local dest_dir="$2"
   local extract_dir="$3"
 
+  logger "INFO" "Extracting release archive: $archive_file"
   mkdir -p "$extract_dir" "$dest_dir"
 
   if ! command -v tar >/dev/null 2>&1; then
-    echo "error: release install requires tar" >&2
+    logger "ERROR" "Release install requires tar, but tar was not found in PATH"
     exit 1
   fi
 
@@ -81,6 +152,7 @@ extract_release_archive() {
     source_dir="$extract_dir"
   fi
 
+  logger "INFO" "Archive extracted to: $source_dir"
   copy_release_tree_from_repo "$source_dir" "$dest_dir"
 }
 
@@ -90,7 +162,7 @@ install_file() {
 
   mkdir -p "$(dirname "$dest_file")"
   cp -f "$source_file" "$dest_file"
-  echo "Installed $dest_file"
+  logger "INFO" "Installed: $dest_file"
 }
 
 copy_release_tree_from_repo() {
@@ -98,19 +170,24 @@ copy_release_tree_from_repo() {
   local dest_dir="$2"
   local source_file relative_file
 
+  logger "INFO" "Copying release files from $source_dir to $dest_dir"
   while IFS= read -r source_file; do
     relative_file="${source_file#$source_dir/}"
     install_file "$source_file" "$dest_dir/$relative_file"
   done < <(find "$source_dir" -type f \( -name 'lfg.*' -o -path "$source_dir/functions/*" -o -path "$source_dir/completions/*" \) | sort)
+  logger "INFO" "Copied release files to: $dest_dir"
 }
 
 reset_install_dir() {
+  logger "INFO" "Resetting install directory: $INSTALL_DIR"
   rm -rf "$INSTALL_DIR"
   mkdir -p "$INSTALL_DIR"
+  logger "INFO" "Install directory ready: $INSTALL_DIR"
 }
 
 install_release_tree() {
   if [ "$IS_LOCAL" = true ]; then
+    logger "INFO" "Installing release tree from local repository"
     copy_release_tree_from_repo "$REPO_ROOT" "$INSTALL_DIR"
     REPO_ROOT="$INSTALL_DIR"
     return 0
@@ -124,21 +201,26 @@ install_release_tree() {
   archive_file="$INSTALL_DIR/lfg-$asset_version.tar.gz"
   extract_dir="$INSTALL_DIR/release"
 
-  echo "Downloading $release_url"
+  logger "INFO" "Resolved release URL: $release_url"
   download_file "$release_url" "$archive_file"
   extract_release_archive "$archive_file" "$INSTALL_DIR" "$extract_dir"
   rm -rf "$archive_file" "$extract_dir"
+  logger "INFO" "Cleaned up temporary release files"
 
   REPO_ROOT="$INSTALL_DIR"
 }
 
+#######################################
+# Shell configuration
+#######################################
 add_source_block_to_file() {
   local source_line="$1"
   local file="$2"
 
+  logger "INFO" "Adding lfg source block to: $file"
   mkdir -p "$(dirname "$file")"
   if [ -f "$file" ] && grep -Fxq "$source_line" "$file"; then
-    echo "Already present in $file"
+    logger "INFO" "Source line already present in: $file"
   else
     {
       echo ""
@@ -148,7 +230,7 @@ add_source_block_to_file() {
       echo "}"
       echo "$source_line"
     } >> "$file"
-    echo "Added to $file"
+    logger "INFO" "Added lfg source block to: $file"
   fi
 }
 
@@ -159,6 +241,7 @@ find_home_source_dir() {
     return 1
   fi
 
+  logger "INFO" "Searching $HOME for the most common parent directory of git repositories"
   source_dir="$(
     find "$HOME"/*/*/.git -prune -print 2>/dev/null \
       | while IFS= read -r git_dir; do dirname "$(dirname "$git_dir")"; done \
@@ -169,6 +252,7 @@ find_home_source_dir() {
   )"
 
   [ -n "$source_dir" ] || return 1
+  logger "INFO" "Detected source directory: $source_dir"
   echo "$source_dir"
 }
 
@@ -188,23 +272,30 @@ prompt_to_install_fzf_with_brew() {
   prompt_reply "fzf is required but was not found. Install it with 'brew install fzf'? [y/N] "
   case "$PROMPT_REPLY" in
     y|Y|yes|YES|Yes)
+      logger "INFO" "Installing fzf via Homebrew"
       brew install fzf
+      logger "INFO" "fzf installed via Homebrew"
       ;;
     *)
-      echo "error: fzf is required. Install fzf and rerun install.sh." >&2
+      logger "ERROR" "fzf is required. Install fzf and rerun install.sh."
       exit 1
       ;;
   esac
 }
 
 check_dependencies() {
+  logger "INFO" "Checking dependencies"
   if ! command -v fzf >/dev/null 2>&1; then
+    logger "WARN" "fzf not found in PATH"
     if command -v brew >/dev/null 2>&1; then
+      logger "INFO" "Homebrew detected; offering to install fzf"
       prompt_to_install_fzf_with_brew
     else
-      echo "error: fzf is required. Install fzf and rerun install.sh." >&2
+      logger "ERROR" "fzf is required. Install fzf and rerun install.sh."
       exit 1
     fi
+  else
+    logger "INFO" "fzf is available"
   fi
 }
 
@@ -213,10 +304,12 @@ maybe_add_lfg_source_dir_to_file() {
   local found_dir prompt source_line
 
   if [ -n "${LFG_SOURCE_DIR:-}" ]; then
+    logger "INFO" "LFG_SOURCE_DIR is already set in the environment: $LFG_SOURCE_DIR"
     return 0
   fi
 
   if [ -f "$file" ] && grep -Eq '(^|[[:space:]])(export[[:space:]]+)?LFG_SOURCE_DIR=' "$file"; then
+    logger "INFO" "LFG_SOURCE_DIR already configured in: $file"
     return 0
   fi
 
@@ -225,18 +318,19 @@ maybe_add_lfg_source_dir_to_file() {
   if [ -n "$found_dir" ]; then
     printf -v source_line "export LFG_SOURCE_DIR=%q" "$found_dir"
     prompt="Add '$source_line' to $file? [y/N] "
-    echo "Found source directory: $found_dir"
     prompt_reply "$prompt"
     case "$PROMPT_REPLY" in
       y|Y|yes|YES|Yes)
         ;;
       *)
-        echo "Skipped LFG_SOURCE_DIR shell configuration update."
+        logger "WARN" "Skipped LFG_SOURCE_DIR shell configuration update"
         return 0
         ;;
     esac
   else
+    logger "WARN" "Could not find a sources directory under $HOME"
     cat <<'EOF'
+
 =======================================
 WARNING: Could not find a sources dir
 
@@ -246,6 +340,7 @@ local git repos to function.
 Set this in your shell profile
 `export LFG_SOURCE_DIR=<source_dir>`
 =======================================
+
 EOF
     return 0
   fi
@@ -256,7 +351,7 @@ EOF
     echo ""
     echo "$source_line"
   } >> "$file"
-  echo "Added LFG_SOURCE_DIR to $file"
+  logger "INFO" "Added LFG_SOURCE_DIR to: $file"
 }
 
 shell_has_lfg() {
@@ -282,10 +377,12 @@ shell_has_lfg() {
 }
 
 install_zsh() {
+  logger "INFO" "=== Installing lfg for zsh ==="
   install_source_shell zsh lfg.zsh "$ZSHRC"
 }
 
 install_bash() {
+  logger "INFO" "=== Installing lfg for bash ==="
   install_source_shell bash lfg.bash "$BASHRC"
 }
 
@@ -294,26 +391,40 @@ install_source_shell() {
   local script_name="$2"
   local config_file="$3"
 
-  echo "Installing lfg for $shell_name"
+  logger "INFO" "Checking lfg source file: $INSTALL_DIR/$script_name"
+  if [ ! -f "$INSTALL_DIR/$script_name" ]; then
+    logger "ERROR" "Required source file not found: $INSTALL_DIR/$script_name"
+    exit 1
+  fi
+
   maybe_add_lfg_source_dir_to_file "$config_file"
   if shell_has_lfg "$shell_name"; then
-    echo "lfg is already installed for $shell_name; skipping ${config_file##*/} update"
+    logger "INFO" "lfg is already installed for $shell_name; skipping ${config_file##*/} update"
   else
     add_source_block_to_file "source \"$INSTALL_DIR/$script_name\"" "$config_file"
   fi
 }
 
 install_fish() {
-  echo "Installing lfg for fish"
+  logger "INFO" "=== Installing lfg for fish ==="
   local source_file
 
+  logger "INFO" "Installing fish functions to: $FISH_CONFIG_DIR/functions"
   for source_file in "$INSTALL_DIR/functions/"*.fish; do
-    install_file "$source_file" "$FISH_CONFIG_DIR/functions/${source_file##*/}"
+    if [ -e "$source_file" ]; then
+      install_file "$source_file" "$FISH_CONFIG_DIR/functions/${source_file##*/}"
+    fi
   done
+
+  logger "INFO" "Installing fish completions to: $FISH_CONFIG_DIR/completions"
   for source_file in "$INSTALL_DIR/completions/"*.fish; do
-    install_file "$source_file" "$FISH_CONFIG_DIR/completions/${source_file##*/}"
+    if [ -e "$source_file" ]; then
+      install_file "$source_file" "$FISH_CONFIG_DIR/completions/${source_file##*/}"
+    fi
   done
+
   install_file "$INSTALL_DIR/completions/lfg.entrypoints" "$FISH_CONFIG_DIR/completions/lfg.entrypoints"
+  logger "INFO" "fish configuration complete"
 }
 
 oh_my_zsh_plugin_dir() {
@@ -322,84 +433,27 @@ oh_my_zsh_plugin_dir() {
 }
 
 install_oh_my_zsh() {
-  echo "Installing lfg as an Oh My Zsh plugin"
+  logger "INFO" "=== Installing lfg as an Oh My Zsh plugin ==="
   local plugin_dir
+
   plugin_dir="$(oh_my_zsh_plugin_dir)"
+  logger "INFO" "Oh My Zsh plugin directory: $plugin_dir"
+
   install_file "$INSTALL_DIR/lfg.zsh" "$plugin_dir/lfg.zsh"
   install_file "$INSTALL_DIR/lfg.plugin.zsh" "$plugin_dir/lfg.plugin.zsh"
   install_file "$INSTALL_DIR/completions/lfg.entrypoints" "$plugin_dir/completions/lfg.entrypoints"
-  echo "Plugin installed to $plugin_dir"
+
+  logger "INFO" "Plugin installed to: $plugin_dir"
   if shell_has_lfg zsh; then
-    echo "lfg is already installed for zsh"
+    logger "INFO" "lfg is already loaded for zsh"
   else
-    echo "Add 'lfg' to the plugins array in your .zshrc if it is not already there."
+    logger "WARN" "Add 'lfg' to the plugins array in your .zshrc if it is not already there"
   fi
 }
 
-METHOD="auto"
-
-require_option_value() {
-  local option="$1"
-  local value="${2:-}"
-
-  if [ -z "$value" ]; then
-    echo "error: $option requires a value" >&2
-    exit 1
-  fi
-}
-
-parse_args() {
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --install-dir)
-        require_option_value "$1" "${2:-}"
-        INSTALL_DIR="$2"
-        shift
-        ;;
-      --install-shell)
-        require_option_value "$1" "${2:-}"
-        if ! METHOD="$(install_method_from_value "$2")"; then
-          echo "error: --install-shell must be zsh, bash, fish, oh-my-zsh, or a path ending in zsh, bash, or fish." >&2
-          exit 1
-        fi
-        shift
-        ;;
-      --install-version)
-        require_option_value "$1" "${2:-}"
-        INSTALL_VERSION="$2"
-        shift
-        ;;
-      -h|--help)
-        usage
-        exit 0
-        ;;
-      *)
-        echo "Unknown option: $1" >&2
-        usage >&2
-        exit 1
-        ;;
-    esac
-    shift
-  done
-}
-
-detect_shell() {
-  local shell_name
-
-  if [ -n "${SHELL:-}" ] && shell_name="$(install_method_from_value "$SHELL")"; then
-    echo "$shell_name"
-  elif [ -n "${ZSH_VERSION:-}" ]; then
-    echo "zsh"
-  elif [ -n "${BASH_VERSION:-}" ]; then
-    echo "bash"
-  elif [ -n "${FISH_VERSION:-}" ]; then
-    echo "fish"
-  else
-    # Default to zsh for lack of better information.
-    echo "zsh"
-  fi
-}
-
+#######################################
+# Shell detection and dispatch
+#######################################
 install_method_from_value() {
   local value="$1"
   local method="${value##*/}"
@@ -414,7 +468,37 @@ install_method_from_value() {
   esac
 }
 
+detect_shell() {
+  local shell_name
+
+  if [ -n "${SHELL:-}" ] && shell_name="$(install_method_from_value "$SHELL")"; then
+    logger "INFO" "Detected shell from \$SHELL: $shell_name"
+    echo "$shell_name"
+  elif [ -n "${ZSH_VERSION:-}" ]; then
+    logger "INFO" "Detected shell from running shell: zsh"
+    echo "zsh"
+  elif [ -n "${BASH_VERSION:-}" ]; then
+    logger "INFO" "Detected shell from running shell: bash"
+    echo "bash"
+  elif [ -n "${FISH_VERSION:-}" ]; then
+    logger "INFO" "Detected shell from running shell: fish"
+    echo "fish"
+  else
+    logger "WARN" "Could not detect shell; defaulting to zsh"
+    echo "zsh"
+  fi
+}
+
+#######################################
+# Main entry point
+#######################################
+METHOD="auto"
+
 main() {
+  logger "INFO" "=== Starting lfg installation ==="
+  logger "INFO" "Install directory: $INSTALL_DIR"
+  logger "INFO" "Requested version: $INSTALL_VERSION"
+
   parse_args "$@"
   check_dependencies
   detect_source
@@ -422,8 +506,11 @@ main() {
   install_release_tree
 
   if [ "$METHOD" = "auto" ]; then
+    logger "INFO" "No shell specified; auto-detecting shell"
     METHOD="$(detect_shell)"
   fi
+
+  logger "INFO" "Installing for shell/method: $METHOD"
 
   case "$METHOD" in
     zsh) install_zsh ;;
@@ -431,12 +518,12 @@ main() {
     fish) install_fish ;;
     oh-my-zsh) install_oh_my_zsh ;;
     *)
-      echo "Unknown install method: $METHOD" >&2
+      logger "ERROR" "Unknown install method: $METHOD"
       exit 1
       ;;
   esac
 
-  echo "Done."
+  logger "INFO" "=== lfg installation complete ==="
 }
 
 main "$@"

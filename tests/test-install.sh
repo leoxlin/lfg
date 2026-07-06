@@ -63,11 +63,11 @@ assert_output_installs_release_tree() {
   local install_dir="$2"
   local message="$3"
 
-  assert_file_contains "$output_file" "Installed $install_dir/lfg.bash" "$message installed bash script"
-  assert_file_contains "$output_file" "Installed $install_dir/lfg.zsh" "$message installed zsh script"
-  assert_file_contains "$output_file" "Installed $install_dir/lfg.plugin.zsh" "$message installed plugin script"
-  assert_file_contains "$output_file" "Installed $install_dir/functions/lfg.fish" "$message installed fish function"
-  assert_file_contains "$output_file" "Installed $install_dir/completions/lfg.entrypoints" "$message installed entrypoint completions"
+  assert_file_contains "$output_file" "Installed: $install_dir/lfg.bash" "$message installed bash script"
+  assert_file_contains "$output_file" "Installed: $install_dir/lfg.zsh" "$message installed zsh script"
+  assert_file_contains "$output_file" "Installed: $install_dir/lfg.plugin.zsh" "$message installed plugin script"
+  assert_file_contains "$output_file" "Installed: $install_dir/functions/lfg.fish" "$message installed fish function"
+  assert_file_contains "$output_file" "Installed: $install_dir/completions/lfg.entrypoints" "$message installed entrypoint completions"
 }
 
 assert_file_contains() {
@@ -253,12 +253,12 @@ run_install_auto_detect_case() {
   assert_output_installs_release_tree "$output_file" "$install_dir" "install/$case_name output"
   case "$expected_method" in
     fish)
-      assert_file_contains "$output_file" "Installed $xdg_config_home/fish/functions/lfg.fish" "install/$case_name output fish function"
-      assert_file_contains "$output_file" "Installed $xdg_config_home/fish/completions/lfg.fish" "install/$case_name output fish completion"
+      assert_file_contains "$output_file" "Installed: $xdg_config_home/fish/functions/lfg.fish" "install/$case_name output fish function"
+      assert_file_contains "$output_file" "Installed: $xdg_config_home/fish/completions/lfg.fish" "install/$case_name output fish completion"
       ;;
     oh-my-zsh)
-      assert_file_contains "$output_file" "Installed $home/.oh-my-zsh/custom/plugins/lfg/lfg.zsh" "install/$case_name output oh-my-zsh script"
-      assert_file_contains "$output_file" "Installed $home/.oh-my-zsh/custom/plugins/lfg/lfg.plugin.zsh" "install/$case_name output oh-my-zsh plugin"
+      assert_file_contains "$output_file" "Installed: $home/.oh-my-zsh/custom/plugins/lfg/lfg.zsh" "install/$case_name output oh-my-zsh script"
+      assert_file_contains "$output_file" "Installed: $home/.oh-my-zsh/custom/plugins/lfg/lfg.plugin.zsh" "install/$case_name output oh-my-zsh plugin"
       ;;
   esac
 
@@ -448,7 +448,7 @@ run_install_source_dir_prompt_case() {
     fail "install/source-dir-prompt failed"
   fi
 
-  assert_file_contains "$output_file" "Found source directory: $source_dir" "install/source-dir-prompt found source dir"
+  assert_file_contains "$output_file" "Detected source directory: $source_dir" "install/source-dir-prompt found source dir"
   assert_file_contains "$zdotdir/.zshrc" "export LFG_SOURCE_DIR=$source_dir" "install/source-dir-prompt zsh source dir"
   assert_file_contains_before "$zdotdir/.zshrc" "export LFG_SOURCE_DIR=$source_dir" "source \"$install_dir/lfg.zsh\"" "install/source-dir-prompt source dir before lfg source"
   assert_install_dir_contains_release_tree "$install_dir" "install/source-dir-prompt release tree"
@@ -571,7 +571,7 @@ run_install_dependencies_missing_fzf_case() {
     fail "install/dependencies-missing-fzf: expected missing fzf to fail"
   fi
 
-  assert_file_contains "$output_file" "error: fzf is required. Install fzf and rerun install.sh." "install/dependencies-missing-fzf error"
+  assert_file_contains "$output_file" "fzf is required. Install fzf and rerun install.sh." "install/dependencies-missing-fzf error"
   assert_file_exists "$stale_file" "install/dependencies-missing-fzf keeps install dir before dependency checks pass"
 
   echo "ok - install/dependencies-missing-fzf"
