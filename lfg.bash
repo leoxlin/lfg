@@ -7,6 +7,7 @@
 #     lfg               -> claude in a picked branch
 #     lfg codex         -> codex in a picked branch
 #     lfg claude feat/x -> claude in worktree for branch feat/x
+#     lfg update        -> download and install the latest lfg release
 # - Outside a git repo: pick one from $LFG_SOURCE_DIR via fzf (type to filter).
 # - With no branch: pick an existing worktree branch, or type a new name to
 #   create one.
@@ -481,8 +482,43 @@ function _lfg_in_worktree() {
   [ "$git_dir" != "$common_dir" ]
 }
 
+function _lfg_update() {
+  local install_url install_dir repo_url release_version install_script update_status
+
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "lfg: curl is required to update" >&2
+    return 1
+  fi
+
+  install_url="https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh"
+  install_dir="${LFG_INSTALL_DIR:-$HOME/.config/lfg}"
+  repo_url="${LFG_REPO_URL:-https://github.com/leoxlin/lfg.git}"
+  release_version="${LFG_RELEASE_VERSION:-latest}"
+
+  install_script="$(mktemp "${TMPDIR:-/tmp}/lfg-install.XXXXXX")" || return 1
+  if ! curl -fsSL "$install_url" -o "$install_script"; then
+    rm -f "$install_script"
+    return 1
+  fi
+
+  INSTALL_SHELL=bash \
+    LFG_INSTALL_DIR="$install_dir" \
+    LFG_REPO_URL="$repo_url" \
+    LFG_RELEASE_VERSION="$release_version" \
+    bash "$install_script"
+  update_status=$?
+
+  rm -f "$install_script"
+  return "$update_status"
+}
+
 function lfg() {
   local entrypoint branch repo
+
+  if [ "${1:-}" = "update" ]; then
+    _lfg_update
+    return
+  fi
 
   entrypoint="${1:-${LFG_DEFAULT_AGENT_COMMAND:-claude}}"
   branch="$2"
@@ -519,7 +555,7 @@ function _lfg_completion() {
 
   case "$COMP_CWORD" in
     1)
-      COMPREPLY=( $(compgen -W "claude claude-code codex aider gemini" -- "$cur") )
+      COMPREPLY=( $(compgen -W "update claude claude-code codex aider gemini" -- "$cur") )
       ;;
     2)
       branches="$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)"

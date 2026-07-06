@@ -7,6 +7,7 @@
 #     lfg               -> claude in a picked branch
 #     lfg codex         -> codex in a picked branch
 #     lfg claude feat/x -> claude in worktree for branch feat/x
+#     lfg update        -> download and install the latest lfg release
 # - Outside a git repo: pick one from $LFG_SOURCE_DIR via fzf (type to filter).
 # - With no branch: pick an existing worktree branch, or type a new name to
 #   create one.
@@ -27,7 +28,60 @@ function _lfg_in_worktree
     test "$git_dir" != "$common_dir"
 end
 
+function _lfg_update
+    if not command -v curl >/dev/null 2>&1
+        echo "lfg: curl is required to update" >&2
+        return 1
+    end
+
+    set -l install_url https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh
+
+    set -l install_dir "$HOME/.config/lfg"
+    if set -q LFG_INSTALL_DIR
+        set install_dir "$LFG_INSTALL_DIR"
+    end
+
+    set -l repo_url https://github.com/leoxlin/lfg.git
+    if set -q LFG_REPO_URL
+        set repo_url "$LFG_REPO_URL"
+    end
+
+    set -l release_version latest
+    if set -q LFG_RELEASE_VERSION
+        set release_version "$LFG_RELEASE_VERSION"
+    end
+
+    set -l tmpdir /tmp
+    if set -q TMPDIR
+        set tmpdir "$TMPDIR"
+    end
+
+    set -l install_script (mktemp "$tmpdir/lfg-install.XXXXXX")
+    or return 1
+
+    if not curl -fsSL "$install_url" -o "$install_script"
+        rm -f "$install_script"
+        return 1
+    end
+
+    env \
+        INSTALL_SHELL=fish \
+        LFG_INSTALL_DIR="$install_dir" \
+        LFG_REPO_URL="$repo_url" \
+        LFG_RELEASE_VERSION="$release_version" \
+        bash "$install_script"
+    set -l update_status $status
+
+    rm -f "$install_script"
+    return $update_status
+end
+
 function lfg
+    if set -q argv[1]; and test "$argv[1]" = update
+        _lfg_update
+        return
+    end
+
     set -l entrypoint
     if set -q argv[1]
         set entrypoint $argv[1]

@@ -12,6 +12,7 @@ Examples:
 - `lfg` - launch the default agent in a picked branch.
 - `lfg codex` - launch `codex` in a picked branch.
 - `lfg claude feat/x` - launch `claude` in a worktree for branch `feat/x`.
+- `lfg update` - download and install the latest lfg release.
 
 ## Behavior
 
@@ -19,6 +20,7 @@ Examples:
 - With no branch, `lfg` asks you to pick an existing worktree branch or type a new branch name to create one.
 - If already inside a linked worktree and no branch is requested, `lfg` launches the agent in the current directory.
 - Otherwise, `lfg` creates or switches to the requested worktree through `worktree`, then launches the agent there.
+- `lfg update` reruns the remote installer and downloads the latest GitHub release by default.
 - Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>` and reused by branch.
 - If `mise` is installed, entering a worktree auto-trusts its `mise` config when it is not already trusted. This prevents `mise`'s `chpwd` hook from erroring.
 
@@ -58,8 +60,9 @@ After removals, it runs `git worktree prune` from the main checkout.
 
 ## Completion
 
-Tab completion is available for the agent entrypoints:
+Tab completion is available for `update` and the agent entrypoints:
 
+- `update`
 - `claude`
 - `claude-code`
 - `codex`
@@ -78,8 +81,9 @@ Configure `lfg` with environment variables.
 | `LFG_PRUNE_OLDER_THAN_DAYS` | `1` | Worktrees older than this many days are pruned. |
 | `LFG_FZF_HIGHLIGHT_COLOR` | `green` | Highlight color passed to `fzf`. |
 | `LFG_SOURCE_DIR` | `~/src` | Root directory scanned for repos when `lfg` is run outside a git repo. |
-| `LFG_INSTALL_DIR` | `~/.config/lfg` | Directory replaced by `install.sh` on every run. Remote installs clone into `$LFG_INSTALL_DIR/repo`. |
-| `LFG_REPO_URL` | `https://github.com/leoxlin/lfg.git` | Git URL cloned by `install.sh` when run remotely. |
+| `LFG_INSTALL_DIR` | `~/.config/lfg` | Directory replaced by `install.sh` on every run. Remote installs stage release files in `$LFG_INSTALL_DIR/repo`. |
+| `LFG_REPO_URL` | `https://github.com/leoxlin/lfg.git` | GitHub repository used by remote installs and `lfg update`. |
+| `LFG_RELEASE_VERSION` | `latest` | Release version installed by remote installs and `lfg update`. Use values like `0.1.0`; tags with a leading `v` are also accepted. |
 | `INSTALL_SHELL` | unset | Shell selected by `install.sh` auto-detection. Accepts `zsh`, `bash`, `fish`, `oh-my-zsh`, or a path ending in `zsh`, `bash`, or `fish`. |
 
 Set a different default agent:
@@ -110,6 +114,13 @@ Install for a specific shell:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | INSTALL_SHELL=fish bash
+```
+
+Install or update to a specific release:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | LFG_RELEASE_VERSION=0.1.0 bash
+LFG_RELEASE_VERSION=0.1.0 lfg update
 ```
 
 ## Related Docs

@@ -85,6 +85,91 @@ EOF
   chmod +x "$bin_dir/fzf"
 }
 
+write_fake_release_curl() {
+  local bin_dir="$1"
+
+  cat > "$bin_dir/curl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${LFG_FAKE_CURL_LOG:?LFG_FAKE_CURL_LOG must be set}"
+: "${LFG_RELEASE_ZIP_DIR:?LFG_RELEASE_ZIP_DIR must be set}"
+
+output=""
+url=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o)
+      output="$2"
+      shift 2
+      ;;
+    -*)
+      shift
+      ;;
+    *)
+      url="$1"
+      shift
+      ;;
+  esac
+done
+
+printf '%s\n' "$url" >> "$LFG_FAKE_CURL_LOG"
+
+case "$url" in
+  https://api.github.com/repos/leoxlin/lfg/releases/latest)
+    printf '{"tag_name":"v1.2.3"}\n'
+    ;;
+  https://github.com/leoxlin/lfg/releases/download/v1.2.3/lfg-1.2.3.zip)
+    cp "$LFG_RELEASE_ZIP_DIR/lfg-1.2.3.zip" "$output"
+    ;;
+  https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.zip)
+    cp "$LFG_RELEASE_ZIP_DIR/lfg-2.0.0.zip" "$output"
+    ;;
+  *)
+    echo "fake curl: unexpected URL: $url" >&2
+    exit 22
+    ;;
+esac
+EOF
+  chmod +x "$bin_dir/curl"
+}
+
+write_fake_update_curl() {
+  local bin_dir="$1"
+
+  cat > "$bin_dir/curl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${LFG_FAKE_CURL_LOG:?LFG_FAKE_CURL_LOG must be set}"
+: "${LFG_FAKE_INSTALLER:?LFG_FAKE_INSTALLER must be set}"
+
+output=""
+url=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o)
+      output="$2"
+      shift 2
+      ;;
+    -*)
+      shift
+      ;;
+    *)
+      url="$1"
+      shift
+      ;;
+  esac
+done
+
+printf '%s\n' "$url" >> "$LFG_FAKE_CURL_LOG"
+cp "$LFG_FAKE_INSTALLER" "$output"
+EOF
+  chmod +x "$bin_dir/curl"
+}
+
 setup_repo() {
   local tmp="$1"
   local source_dir="$tmp/src"
@@ -292,6 +377,54 @@ run_install_replaces_install_dir_case() {
   echo "ok - install/replaces-install-dir-$method"
 }
 
+run_install_remote_release_case() {
+  local case_name="$1"
+  local release_version="$2"
+  local expected_url="$3"
+  local tmp="$tmp_root/install-remote-release-$case_name"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local bin_dir="$tmp/bin"
+  local zip_dir="$tmp/zips"
+  local curl_log="$tmp/curl.log"
+  local output_file="$tmp/install.out"
+  local -a env_args
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$zip_dir"
+  write_fake_release_curl "$bin_dir"
+
+  LFG_DIST_DIR="$zip_dir" "$ROOT/scripts/release.sh" 1.2.3 >/dev/null
+  LFG_DIST_DIR="$zip_dir" "$ROOT/scripts/release.sh" 2.0.0 >/dev/null
+
+  env_args=(
+    "HOME=$home"
+    "ZDOTDIR=$zdotdir"
+    "XDG_CONFIG_HOME=$xdg_config_home"
+    "LFG_INSTALL_DIR=$install_dir"
+    "INSTALL_SHELL=zsh"
+    "SHELL=/bin/zsh"
+    "PATH=$bin_dir:$PATH"
+    "LFG_FAKE_CURL_LOG=$curl_log"
+    "LFG_RELEASE_ZIP_DIR=$zip_dir"
+  )
+
+  if [ -n "$release_version" ]; then
+    env_args+=("LFG_RELEASE_VERSION=$release_version")
+  fi
+
+  if ! env "${env_args[@]}" bash -s -- < "$ROOT/install.sh" > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/remote-release-$case_name failed"
+  fi
+
+  assert_file_exists "$install_dir/lfg.zsh" "install/remote-release-$case_name installed zsh script"
+  assert_file_contains "$curl_log" "$expected_url" "install/remote-release-$case_name downloaded expected release"
+
+  echo "ok - install/remote-release-$case_name"
+}
+
 run_install_cases() {
   local removed_arg
 
@@ -306,6 +439,9 @@ run_install_cases() {
 
   run_install_replaces_install_dir_case "zsh" "zsh"
   run_install_replaces_install_dir_case "bash" "bash"
+
+  run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/v1.2.3/lfg-1.2.3.zip"
+  run_install_remote_release_case "specific" "v2.0.0" "https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.zip"
 
   for removed_arg in --zsh --bash --fish --oh-my-zsh; do
     run_install_rejects_args_case "$removed_arg"
@@ -473,9 +609,70 @@ run_shell_cases() {
   done
 }
 
+run_lfg_update_bash_case() {
+  local tmp="$tmp_root/lfg-update-bash"
+  local bin_dir="$tmp/bin"
+  local fake_installer="$tmp/install.sh"
+  local curl_log="$tmp/curl.log"
+  local capture="$tmp/update.env"
+  local script="$tmp/update.bash"
+  local output_file="$tmp/update.out"
+  local stderr_file="$tmp/update.err"
+
+  mkdir -p "$bin_dir"
+  write_fake_update_curl "$bin_dir"
+
+  cat > "$fake_installer" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${LFG_UPDATE_CAPTURE:?LFG_UPDATE_CAPTURE must be set}"
+
+{
+  printf 'install_shell=%s\n' "${INSTALL_SHELL:-}"
+  printf 'install_dir=%s\n' "${LFG_INSTALL_DIR:-}"
+  printf 'repo_url=%s\n' "${LFG_REPO_URL:-}"
+  printf 'release_version=%s\n' "${LFG_RELEASE_VERSION:-}"
+} > "$LFG_UPDATE_CAPTURE"
+EOF
+
+  cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$ROOT/lfg.bash"
+export LFG_INSTALL_DIR="$tmp/install-dir"
+export LFG_REPO_URL="https://github.com/leoxlin/lfg.git"
+export LFG_RELEASE_VERSION="2.0.0"
+lfg update > "$output_file" 2> "$stderr_file"
+EOF
+  chmod +x "$script"
+
+  if ! PATH="$bin_dir:$PATH" \
+      LFG_FAKE_CURL_LOG="$curl_log" \
+      LFG_FAKE_INSTALLER="$fake_installer" \
+      LFG_UPDATE_CAPTURE="$capture" \
+      bash --noprofile --norc "$script"; then
+    echo "stdout:" >&2
+    cat "$output_file" >&2 || true
+    echo "stderr:" >&2
+    cat "$stderr_file" >&2 || true
+    fail "lfg/update-bash failed"
+  fi
+
+  assert_file_contains "$curl_log" "https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh" "lfg/update-bash downloaded installer"
+  assert_eq "$(field install_shell "$capture")" "bash" "lfg/update-bash install shell"
+  assert_eq "$(field install_dir "$capture")" "$tmp/install-dir" "lfg/update-bash install dir"
+  assert_eq "$(field repo_url "$capture")" "https://github.com/leoxlin/lfg.git" "lfg/update-bash repo url"
+  assert_eq "$(field release_version "$capture")" "2.0.0" "lfg/update-bash release version"
+
+  echo "ok - lfg/update-bash"
+}
+
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/lfg-tests.XXXXXX")"
 
 run_install_cases
+
+run_lfg_update_bash_case
 
 run_shell_cases "bash" "bash"
 run_shell_cases "zsh" "zsh"

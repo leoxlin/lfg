@@ -4,21 +4,13 @@ set -euo pipefail
 LFG_INSTALL_DIR="${LFG_INSTALL_DIR:-$HOME/.config/lfg}"
 LFG_REPO_URL="${LFG_REPO_URL:-https://github.com/leoxlin/lfg.git}"
 LFG_REPO_REF="${LFG_REPO_REF:-main}"
+LFG_RELEASE_VERSION="${LFG_RELEASE_VERSION:-latest}"
 ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
 BASHRC="${HOME}/.bashrc"
 FISH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fish"
 
 REPO_ROOT=""
 IS_LOCAL=false
-REPO_FILES=(
-  lfg.zsh
-  lfg.bash
-  lfg.plugin.zsh
-  functions/lfg.fish
-  functions/worktree.fish
-  completions/lfg.fish
-  completions/worktree.fish
-)
 
 usage() {
   cat <<EOF
@@ -30,7 +22,7 @@ Options:
   --install-dir   Override install directory (default: ~/.config/lfg)
   --repo-url      Override git repo URL for remote installs
                   (default: ${LFG_REPO_URL})
-  --repo-ref      Override git ref (branch/tag) for remote installs
+  --repo-ref      Override git ref for non-GitHub remote fallback installs
                   (default: ${LFG_REPO_REF})
   -h, --help      Show this help message
 
@@ -42,10 +34,9 @@ Remote install:
   curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | INSTALL_SHELL="$SHELL" bash
   curl -sSL https://raw.githubusercontent.com/<user>/lfg/main/install.sh | INSTALL_SHELL=fish bash
 
-The remote installer downloads the files from the repository into
-~/.config/lfg/repo and installs from there. Override the URL or ref with
-the LFG_REPO_URL / LFG_REPO_REF environment variables or the --repo-url
-/ --repo-ref options.
+The remote installer downloads the latest GitHub release archive by default.
+Set LFG_RELEASE_VERSION to a release version such as 0.1.0 to install a
+specific release. Override the repository with LFG_REPO_URL or --repo-url.
 EOF
 }
 
@@ -59,11 +50,10 @@ detect_source() {
   fi
 }
 
-# Convert a GitHub repo URL into a raw.githubusercontent.com base URL.
+# Convert a GitHub repo URL into owner/repo.
 # Supports https://github.com/owner/repo.git and git@github.com:owner/repo.git.
-github_raw_base() {
+github_repo_path() {
   local url="$1"
-  local ref="$2"
   local owner path repo
 
   if [[ "$url" =~ ^https://github\.com/([^/]+)/(.+)$ ]]; then
@@ -77,7 +67,7 @@ github_raw_base() {
   fi
 
   repo="${path%.git}"
-  echo "https://raw.githubusercontent.com/$owner/$repo/$ref"
+  echo "$owner/$repo"
 }
 
 # Download a single file when running remotely.
@@ -89,6 +79,69 @@ download_file() {
     echo "error: failed to download $url" >&2
     exit 1
   fi
+}
+
+latest_github_release_tag() {
+  local repo_path="$1"
+  local tag
+
+  tag="$(curl -fsSL "https://api.github.com/repos/$repo_path/releases/latest" \
+    | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+    | head -n 1)"
+
+  if [ -z "$tag" ]; then
+    echo "error: failed to determine latest release for $repo_path" >&2
+    exit 1
+  fi
+
+  echo "$tag"
+}
+
+release_tag_for_version() {
+  local repo_path="$1"
+  local version="$2"
+
+  if [ "$version" = "latest" ]; then
+    latest_github_release_tag "$repo_path"
+  elif [[ "$version" == v* ]]; then
+    echo "$version"
+  else
+    echo "v$version"
+  fi
+}
+
+extract_release_zip() {
+  local zip_file="$1"
+  local dest_dir="$2"
+  local extract_dir="$3"
+
+  mkdir -p "$extract_dir" "$dest_dir"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$zip_file" "$extract_dir" <<'PY'
+import sys
+import zipfile
+
+zip_file, extract_dir = sys.argv[1:]
+with zipfile.ZipFile(zip_file) as archive:
+    archive.extractall(extract_dir)
+PY
+  elif command -v unzip >/dev/null 2>&1; then
+    unzip -q "$zip_file" -d "$extract_dir"
+  elif command -v bsdtar >/dev/null 2>&1; then
+    bsdtar -xf "$zip_file" -C "$extract_dir"
+  else
+    echo "error: release install requires python3, unzip, or bsdtar" >&2
+    exit 1
+  fi
+
+  local source_dir
+  source_dir="$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d | sort | sed -n '1p')"
+  if [ -z "$source_dir" ]; then
+    source_dir="$extract_dir"
+  fi
+
+  cp -R "$source_dir"/. "$dest_dir"/
 }
 
 reset_install_dir() {
@@ -110,19 +163,24 @@ fetch_repo() {
 
   local repo_dir="$LFG_INSTALL_DIR/repo"
   rm -rf "$repo_dir"
-  mkdir -p "$repo_dir/functions" "$repo_dir/completions"
+  mkdir -p "$repo_dir"
 
-  local raw_base
-  if raw_base="$(github_raw_base "$LFG_REPO_URL" "$LFG_REPO_REF")"; then
-    echo "Downloading files from $raw_base"
-    local file
-    for file in "${REPO_FILES[@]}"; do
-      mkdir -p "$repo_dir/$(dirname "$file")"
-      download_file "$raw_base/$file" "$repo_dir/$file"
-    done
+  local repo_path
+  if repo_path="$(github_repo_path "$LFG_REPO_URL")"; then
+    local release_tag asset_version release_url zip_file extract_dir
+
+    release_tag="$(release_tag_for_version "$repo_path" "$LFG_RELEASE_VERSION")"
+    asset_version="${release_tag#v}"
+    release_url="https://github.com/$repo_path/releases/download/$release_tag/lfg-$asset_version.zip"
+    zip_file="$LFG_INSTALL_DIR/lfg-$asset_version.zip"
+    extract_dir="$LFG_INSTALL_DIR/release"
+
+    echo "Downloading $release_url"
+    download_file "$release_url" "$zip_file"
+    extract_release_zip "$zip_file" "$repo_dir" "$extract_dir"
   else
     echo "Cloning $LFG_REPO_URL"
-    git clone --depth 1 "$LFG_REPO_URL" "$repo_dir"
+    git clone --depth 1 --branch "$LFG_REPO_REF" "$LFG_REPO_URL" "$repo_dir"
   fi
 
   REPO_ROOT="$repo_dir"
