@@ -183,6 +183,30 @@ prompt_reply() {
   fi
 }
 
+prompt_to_install_fzf_with_brew() {
+  prompt_reply "fzf is required but was not found. Install it with 'brew install fzf'? [y/N] "
+  case "$PROMPT_REPLY" in
+    y|Y|yes|YES|Yes)
+      brew install fzf
+      ;;
+    *)
+      echo "error: fzf is required. Install fzf and rerun install.sh." >&2
+      exit 1
+      ;;
+  esac
+}
+
+check_dependencies() {
+  if ! command -v fzf >/dev/null 2>&1; then
+    if command -v brew >/dev/null 2>&1; then
+      prompt_to_install_fzf_with_brew
+    else
+      echo "error: fzf is required. Install fzf and rerun install.sh." >&2
+      exit 1
+    fi
+  fi
+}
+
 maybe_add_lfg_source_dir_to_file() {
   local file="$1"
   local found_dir prompt source_line
@@ -371,6 +395,7 @@ install_method_from_value() {
 
 main() {
   parse_args "$@"
+  check_dependencies
   detect_source
   reset_install_dir
   fetch_repo

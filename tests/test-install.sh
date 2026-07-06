@@ -35,6 +35,15 @@ assert_file_exists() {
   fi
 }
 
+assert_path_not_exists() {
+  local path="$1"
+  local message="$2"
+
+  if [ -e "$path" ]; then
+    fail "$message: expected $path not to exist"
+  fi
+}
+
 assert_file_contains() {
   local file="$1"
   local expected="$2"
@@ -62,6 +71,51 @@ assert_file_contains_before() {
   if [ "$first_line" -ge "$second_line" ]; then
     fail "$message: expected '$first' before '$second'"
   fi
+}
+
+write_fake_fzf() {
+  local bin_dir="$1"
+
+  cat > "$bin_dir/fzf" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$bin_dir/fzf"
+}
+
+write_fake_brew_installs_fzf() {
+  local bin_dir="$1"
+
+  cat > "$bin_dir/brew" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -ne 2 ] || [ "$1" != "install" ] || [ "$2" != "fzf" ]; then
+  echo "fake brew: unexpected command: $*" >&2
+  exit 1
+fi
+
+: "${LFG_FAKE_BREW_LOG:?LFG_FAKE_BREW_LOG must be set}"
+: "${LFG_FAKE_BREW_BIN_DIR:?LFG_FAKE_BREW_BIN_DIR must be set}"
+
+printf '%s\n' "$*" >> "$LFG_FAKE_BREW_LOG"
+cat > "$LFG_FAKE_BREW_BIN_DIR/fzf" <<'FZF'
+#!/usr/bin/env bash
+exit 0
+FZF
+chmod +x "$LFG_FAKE_BREW_BIN_DIR/fzf"
+EOF
+  chmod +x "$bin_dir/brew"
+}
+
+write_minimal_path_command_links() {
+  local bin_dir="$1"
+  local command_name command_path
+
+  for command_name in bash cat chmod dirname rm mkdir cp grep find sort uniq sed; do
+    command_path="$(command -v "$command_name")" || fail "missing command for test setup: $command_name"
+    ln -s "$command_path" "$bin_dir/$command_name"
+  done
 }
 
 write_fake_release_curl() {
@@ -121,9 +175,11 @@ run_install_auto_detect_case() {
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
   local install_dir="$tmp/lfg"
+  local bin_dir="$tmp/bin"
   local output_file="$tmp/install.out"
 
-  mkdir -p "$home" "$zdotdir" "$xdg_config_home"
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
+  write_fake_fzf "$bin_dir"
 
   if ! HOME="$home" \
       ZDOTDIR="$zdotdir" \
@@ -131,6 +187,7 @@ run_install_auto_detect_case() {
       LFG_INSTALL_DIR="$install_dir" \
       INSTALL_SHELL="$install_shell" \
       SHELL="$shell_path" \
+      PATH="$bin_dir:$PATH" \
       bash "$ROOT/install.sh" > "$output_file" 2>&1; then
     cat "$output_file" >&2 || true
     fail "install/$case_name failed"
@@ -195,15 +252,18 @@ run_install_idempotent_case() {
   local install_dir="$tmp/lfg"
   local first_output="$tmp/first.out"
   local second_output="$tmp/second.out"
+  local bin_dir="$tmp/bin"
   local config_file before
 
-  mkdir -p "$home" "$zdotdir" "$xdg_config_home"
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
+  write_fake_fzf "$bin_dir"
 
   HOME="$home" \
     ZDOTDIR="$zdotdir" \
     XDG_CONFIG_HOME="$xdg_config_home" \
     LFG_INSTALL_DIR="$install_dir" \
     INSTALL_SHELL="$install_shell" \
+    PATH="$bin_dir:$PATH" \
     bash "$ROOT/install.sh" > "$first_output" 2>&1
 
   case "$method" in
@@ -224,6 +284,7 @@ run_install_idempotent_case() {
     XDG_CONFIG_HOME="$xdg_config_home" \
     LFG_INSTALL_DIR="$install_dir" \
     INSTALL_SHELL="$install_shell" \
+    PATH="$bin_dir:$PATH" \
     bash "$ROOT/install.sh" > "$second_output" 2>&1
 
   case "$method" in
@@ -266,11 +327,13 @@ run_install_replaces_install_dir_case() {
   local install_dir="$tmp/lfg"
   local first_output="$tmp/first.out"
   local second_output="$tmp/second.out"
+  local bin_dir="$tmp/bin"
   local stale_file="$install_dir/stale-file"
   local stale_dir="$install_dir/stale-dir"
   local installed_file
 
-  mkdir -p "$home" "$zdotdir" "$xdg_config_home"
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
+  write_fake_fzf "$bin_dir"
 
   case "$method" in
     zsh)
@@ -289,6 +352,7 @@ run_install_replaces_install_dir_case() {
     XDG_CONFIG_HOME="$xdg_config_home" \
     LFG_INSTALL_DIR="$install_dir" \
     INSTALL_SHELL="$install_shell" \
+    PATH="$bin_dir:$PATH" \
     bash "$ROOT/install.sh" > "$first_output" 2>&1
 
   mkdir -p "$stale_dir"
@@ -300,6 +364,7 @@ run_install_replaces_install_dir_case() {
     XDG_CONFIG_HOME="$xdg_config_home" \
     LFG_INSTALL_DIR="$install_dir" \
     INSTALL_SHELL="$install_shell" \
+    PATH="$bin_dir:$PATH" \
     bash "$ROOT/install.sh" > "$second_output" 2>&1
 
   assert_file_exists "$installed_file" "install/replaces-install-dir-$method copied script"
@@ -317,6 +382,7 @@ run_install_source_dir_prompt_case() {
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
   local install_dir="$tmp/lfg"
+  local bin_dir="$tmp/bin"
   local output_file="$tmp/install.out"
   local source_dir="$home/Source"
 
@@ -325,8 +391,10 @@ run_install_source_dir_prompt_case() {
     "$home/Code/repo/.git" \
     "$source_dir/repo-one/.git" \
     "$source_dir/repo-two/.git" \
+    "$bin_dir" \
     "$zdotdir" \
     "$xdg_config_home"
+  write_fake_fzf "$bin_dir"
 
   if ! printf 'y\n' | env -u LFG_SOURCE_DIR \
       HOME="$home" \
@@ -334,6 +402,7 @@ run_install_source_dir_prompt_case() {
       XDG_CONFIG_HOME="$xdg_config_home" \
       LFG_INSTALL_DIR="$install_dir" \
       INSTALL_SHELL=zsh \
+      PATH="$bin_dir:$PATH" \
       bash "$ROOT/install.sh" > "$output_file" 2>&1; then
     cat "$output_file" >&2 || true
     fail "install/source-dir-prompt failed"
@@ -363,6 +432,7 @@ run_install_remote_release_case() {
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$archive_dir"
   write_fake_release_curl "$bin_dir"
+  write_fake_fzf "$bin_dir"
 
   LFG_DIST_DIR="$archive_dir" "$ROOT/scripts/release.sh" latest >/dev/null
   LFG_DIST_DIR="$archive_dir" "$ROOT/scripts/release.sh" 2.0.0 >/dev/null
@@ -395,8 +465,127 @@ run_install_remote_release_case() {
   echo "ok - install/remote-release-$case_name"
 }
 
+run_install_dependencies_brew_fzf_case() {
+  local tmp="$tmp_root/install-dependencies-brew-fzf"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local stale_file="$install_dir/stale-file"
+  local bin_dir="$tmp/bin"
+  local brew_log="$tmp/brew.log"
+  local output_file="$tmp/install.out"
+  local bash_bin
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$install_dir" "$bin_dir"
+  printf 'stale\n' > "$stale_file"
+  write_fake_brew_installs_fzf "$bin_dir"
+  write_minimal_path_command_links "$bin_dir"
+
+  bash_bin="$(command -v bash)" || fail "install/dependencies-brew-fzf: bash not found"
+
+  if ! printf 'y\n' | HOME="$home" \
+      ZDOTDIR="$zdotdir" \
+      XDG_CONFIG_HOME="$xdg_config_home" \
+      LFG_INSTALL_DIR="$install_dir" \
+      INSTALL_SHELL=zsh \
+      PATH="$bin_dir" \
+      LFG_FAKE_BREW_LOG="$brew_log" \
+      LFG_FAKE_BREW_BIN_DIR="$bin_dir" \
+      "$bash_bin" "$ROOT/install.sh" > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/dependencies-brew-fzf failed"
+  fi
+
+  assert_file_contains "$output_file" "Install it with 'brew install fzf'?" "install/dependencies-brew-fzf prompt"
+  assert_file_contains "$brew_log" "install fzf" "install/dependencies-brew-fzf brew command"
+  assert_path_not_exists "$stale_file" "install/dependencies-brew-fzf replaces install dir after dependency install"
+  assert_file_exists "$install_dir/lfg.zsh" "install/dependencies-brew-fzf installed zsh script"
+
+  echo "ok - install/dependencies-brew-fzf"
+}
+
+run_install_dependencies_missing_fzf_case() {
+  local tmp="$tmp_root/install-dependencies-missing-fzf"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local stale_file="$install_dir/stale-file"
+  local bin_dir="$tmp/bin"
+  local output_file="$tmp/install.out"
+  local bash_bin
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$install_dir" "$bin_dir"
+  printf 'stale\n' > "$stale_file"
+
+  bash_bin="$(command -v bash)" || fail "install/dependencies-missing-fzf: bash not found"
+
+  if HOME="$home" \
+      ZDOTDIR="$zdotdir" \
+      XDG_CONFIG_HOME="$xdg_config_home" \
+      LFG_INSTALL_DIR="$install_dir" \
+      INSTALL_SHELL=zsh \
+      PATH="$bin_dir" \
+      "$bash_bin" "$ROOT/install.sh" > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/dependencies-missing-fzf: expected missing fzf to fail"
+  fi
+
+  assert_file_contains "$output_file" "error: fzf is required. Install fzf and rerun install.sh." "install/dependencies-missing-fzf error"
+  assert_file_exists "$stale_file" "install/dependencies-missing-fzf keeps install dir before dependency checks pass"
+
+  echo "ok - install/dependencies-missing-fzf"
+}
+
+run_install_dependencies_brew_reject_case() {
+  local tmp="$tmp_root/install-dependencies-brew-reject"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local stale_file="$install_dir/stale-file"
+  local bin_dir="$tmp/bin"
+  local brew_log="$tmp/brew.log"
+  local output_file="$tmp/install.out"
+  local bash_bin
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$install_dir" "$bin_dir"
+  printf 'stale\n' > "$stale_file"
+  write_fake_brew_installs_fzf "$bin_dir"
+
+  bash_bin="$(command -v bash)" || fail "install/dependencies-brew-reject: bash not found"
+
+  if printf 'n\n' | HOME="$home" \
+      ZDOTDIR="$zdotdir" \
+      XDG_CONFIG_HOME="$xdg_config_home" \
+      LFG_INSTALL_DIR="$install_dir" \
+      INSTALL_SHELL=zsh \
+      PATH="$bin_dir" \
+      LFG_FAKE_BREW_LOG="$brew_log" \
+      LFG_FAKE_BREW_BIN_DIR="$bin_dir" \
+      "$bash_bin" "$ROOT/install.sh" > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/dependencies-brew-reject: expected rejected brew install to fail"
+  fi
+
+  assert_file_contains "$output_file" "Install it with 'brew install fzf'?" "install/dependencies-brew-reject prompt"
+  assert_path_not_exists "$brew_log" "install/dependencies-brew-reject does not run brew"
+  assert_file_exists "$stale_file" "install/dependencies-brew-reject keeps install dir before dependency checks pass"
+
+  echo "ok - install/dependencies-brew-reject"
+}
+
+run_install_dependencies_cases() {
+  run_install_dependencies_brew_fzf_case
+  run_install_dependencies_missing_fzf_case
+  run_install_dependencies_brew_reject_case
+}
+
 run_install_cases() {
   local removed_arg
+
+  run_install_dependencies_cases
 
   run_install_auto_detect_case "current-shell-zsh" "" "/bin/zsh" "zsh"
   run_install_auto_detect_case "install-shell-fish" "/usr/bin/fish" "/bin/zsh" "fish"
