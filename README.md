@@ -27,9 +27,4 @@ Jump into a git worktree and start a coding agent.
    lfg
    ```
 
-Examples:
-
-- `lfg` - launch the default agent in a picked branch.
-- `lfg codex` - launch `codex` in a picked branch.
-
 See [Usage](docs/USAGE.md) for command behavior and environment variables.

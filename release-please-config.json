@@ -17,6 +17,10 @@
         },
         {
           "type": "generic",
+          "path": "lfg.plugin.zsh"
+        },
+        {
+          "type": "generic",
           "path": "functions/lfg.fish"
         },
         {

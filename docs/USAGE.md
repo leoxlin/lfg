@@ -1,19 +1,12 @@
 # Usage
 
 ```text
-lfg [entrypoint]
-lfg --help
-lfg --update
+lfg [entrypoint]     (navigate to a worktree and start entrypoint, e.g. codex)
+lfg --update         (update the lfg plugin to latest)
+lfg --help           (show this help)
 ```
 
 - `entrypoint`: the command to run once inside the worktree. Defaults to `${LFG_DEFAULT_AGENT_COMMAND:-claude}`.
-
-Examples:
-
-- `lfg` - launch the default agent in a picked branch.
-- `lfg codex` - launch `codex` in a picked branch.
-- `lfg --help` - show usage.
-- `lfg --update` - download and install the latest lfg release.
 
 ## Behavior
 
@@ -23,7 +16,7 @@ Examples:
 - `lfg` appends `--color=pointer:<pointer-color>` to `FZF_DEFAULT_OPTS` for its `fzf` selectors so the selection pointer is colored by `LFG_FZF_POINTER_COLOR`.
 - If already inside a linked worktree, `lfg` launches the agent in the current directory.
 - Otherwise, `lfg` creates or switches to the selected worktree through `worktree`, then launches the agent there.
-- `lfg --help` prints usage and exits without selecting a repo, entering a worktree, or launching an entrypoint.
+- `lfg --help` prints usage with inline command descriptions, then exits without selecting a repo, entering a worktree, or launching an entrypoint.
 - `lfg --update` downloads the installer and lets it install the latest GitHub release.
 - Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>/<repo>` and reused by branch.
 - If a `lfg_worktree_setup` function exists, `lfg` calls it with the worktree path before entering a worktree.
@@ -33,13 +26,13 @@ Examples:
 The `worktree` helper manages branch-specific worktrees. `wt` is an alias for `worktree`.
 
 ```text
-worktree                         # interactive: pick branch/worktree
-worktree add <branch_name>       # create or switch to a worktree
-worktree cd <branch_name>        # change to or create a worktree
-worktree list                    # list worktrees
-worktree ls                      # alias for list
-worktree prune                   # remove stale worktrees
-worktree remove|rm <branch_name> # remove a worktree
+worktree                                 (pick branch/worktree interactively)
+worktree add <branch>                    (create or switch to a worktree)
+worktree cd <branch>                     (change to or create a worktree)
+worktree list|ls                         (list worktrees)
+worktree prune                           (remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7} day(s), or without remote branch)
+worktree remove|rm <branch>              (remove a worktree)
+worktree help                            (show this help)
 ```
 
 `cd` creates the worktree if it does not already exist.
@@ -47,7 +40,7 @@ worktree remove|rm <branch_name> # remove a worktree
 ## Worktree Conventions
 
 - All `worktree` commands must be run from inside a git repository and operate on that repo only.
-- Branch-related commands (`add`, `cd`, `remove`/`rm`) take a single `<branch_name>` argument.
+- Branch-related commands (`add`, `cd`, `remove`/`rm`) take a single `<branch>` argument.
 - Repo-wide commands (`list`, `ls`, `prune`) take no arguments.
 - Worktree paths replace `/` in branch names with `-`.
 - When creating a new branch, `worktree` starts from `origin/HEAD`, then falls back to `main`, `origin/main`, `master`, `origin/master`, and finally `HEAD`.
@@ -65,7 +58,8 @@ After removals, it runs `git worktree prune` from the main checkout.
 ## Completion
 
 Tab completion is available for `--help`, `--update`, and entrypoint completion
-suggestions. By default, entrypoint completion suggestions use the bundled
+suggestions. Fish and zsh completions include descriptions for the built-in
+options. By default, entrypoint completion suggestions use the bundled
 `completions/lfg.entrypoints` file.
 
 Options:

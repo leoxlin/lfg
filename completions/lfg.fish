@@ -1,11 +1,12 @@
-# Release version: 0.3.0 # x-release-please-version
+# Fish completions for lfg.
+# Release version: 0.2.0 # x-release-please-version
 
 set -g __lfg_completion_dir (status dirname)
 
 complete -c lfg -f
 
-complete -c lfg -n '__fish_is_first_token' -a '--update' -d 'update lfg'
-complete -c lfg -n '__fish_is_first_token' -a '--help' -d 'show usage'
+complete -c lfg -n '__fish_is_first_token' -a '--update' -d 'update the lfg plugin to latest'
+complete -c lfg -n '__fish_is_first_token' -a '--help' -d 'show lfg usage'
 
 function __lfg_completions_file
     if set -q LFG_COMPLETIONS_FILE
@@ -33,4 +34,4 @@ function __lfg_entrypoint_completions
     __lfg_file_entrypoint_completions
 end
 
-complete -c lfg -n '__fish_is_first_token' -a '(__lfg_entrypoint_completions)' -d 'launch agent'
+complete -c lfg -n '__fish_is_first_token' -a '(__lfg_entrypoint_completions)' -d 'launch agent in selected worktree'

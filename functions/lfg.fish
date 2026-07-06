@@ -1,19 +1,5 @@
-# lfg: jump into a worktree and start an agent.
-# Release version: 0.3.0 # x-release-please-version
-#
-# Usage: lfg [entrypoint]
-#
-# - entrypoint: the command to run once inside the worktree (default: claude).
-#     lfg               -> claude in a picked branch
-#     lfg codex         -> codex in a picked branch
-#     lfg --update      -> download and install the latest lfg release
-#     lfg --help        -> show usage
-# - Outside a git repo: pick one from $LFG_SOURCE_DIR via fzf (type to filter).
-# - When not already inside a linked worktree: pick an existing worktree branch,
-#   or type a new name to create one.
-# - Creates/switches the worktree (under $LFG_SOURCE_DIR/.agents/worktrees, via
-#   the worktree helper) and launches the entrypoint there. LFG_SOURCE_DIR
-#   defaults to ~/src if unset.
+# lfg Fish integration.
+# Release version: 0.2.0 # x-release-please-version
 
 # Load the worktree helpers (also defines the worktree command).
 set -l __lfg_dir (status dirname)
@@ -59,9 +45,9 @@ function _lfg_update
 end
 
 function _lfg_usage
-    echo "usage: lfg [entrypoint]"
-    echo "       lfg --update"
-    echo "       lfg --help"
+    echo "usage: lfg [entrypoint]     (navigate to a worktree and start entrypoint, e.g. codex)"
+    echo "       lfg --update         (update the lfg plugin to latest)"
+    echo "       lfg --help           (show this help)"
 end
 
 function lfg

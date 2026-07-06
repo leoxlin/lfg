@@ -1,47 +1,16 @@
-# lfg: jump into a worktree and start an agent.
-# Release version: 0.3.0 # x-release-please-version
-#
-# Usage: lfg [entrypoint]
-#
-# - entrypoint: the command to run once inside the worktree (default: claude).
-#     lfg               -> claude in a picked branch
-#     lfg codex         -> codex in a picked branch
-#     lfg --update      -> download and install the latest lfg release
-#     lfg --help        -> show usage
-# - Outside a git repo: pick one from $LFG_SOURCE_DIR via fzf (type to filter).
-# - When not already inside a linked worktree: pick an existing worktree branch,
-#   or type a new name to create one.
-# - Creates/switches the worktree (under $LFG_SOURCE_DIR/.agents/worktrees, via
-#   the worktree helper) and launches the entrypoint there. LFG_SOURCE_DIR
-#   defaults to ~/src if unset.
-#
-# Worktree helper conventions:
-#
-# - All commands must be run from inside a git repository and operate on that
-#   repo only.
-#
-# - Branch-related commands (add, cd, remove/rm) take a single <branch> argument.
-#
-# - Repo-wide commands (list, ls, prune) take no arguments.
-#
-# - Worktrees are created under $LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>/<repo>
-#   and reused by branch. LFG_SOURCE_DIR defaults to ~/src if unset.
-#
-# - Define lfg_worktree_setup before sourcing lfg to run optional setup before
-#   entering a worktree.
+# lfg Bash integration.
+# Release version: 0.2.0 # x-release-please-version
 
 __lfg_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 function _worktree_usage() {
-  echo "usage: worktree                         (interactive: pick branch/worktree; repo selection only when outside a repo)"
-  echo "       worktree add <branch_name>"
-  echo "       worktree cd <branch_name>"
-  echo "       worktree list"
-  echo "       worktree ls"
-  echo "       worktree prune"
-  echo "       worktree remove|rm <branch_name>"
-  echo ""
-  echo "cd creates the worktree if it does not already exist."
+  echo "usage: worktree                                 (pick branch/worktree interactively)"
+  echo "       worktree add <branch>                    (create or switch to a worktree)"
+  echo "       worktree cd <branch>                     (change to or create a worktree)"
+  echo "       worktree list|ls                         (list worktrees)"
+  echo '       worktree prune                           (remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7}d, or without remote branch)'
+  echo "       worktree remove|rm <branch>              (remove a worktree)"
+  echo "       worktree help                            (show this help)"
 }
 
 function _worktree_require_git_repo() {
@@ -535,9 +504,9 @@ function _lfg_update() {
 }
 
 function _lfg_usage() {
-  echo "usage: lfg [entrypoint]"
-  echo "       lfg --update"
-  echo "       lfg --help"
+  echo "usage: lfg [entrypoint]     (navigate to a worktree and start entrypoint, e.g. codex)"
+  echo "       lfg --update         (update the lfg plugin to latest)"
+  echo "       lfg --help           (show this help)"
 }
 
 function _lfg_completions_file() {

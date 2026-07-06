@@ -1,24 +1,14 @@
-# worktree: worktree helper for lfg.
-# Release version: 0.3.0 # x-release-please-version
-#
-# Usage: worktree                         (interactive: pick branch/worktree)
-#        worktree add <branch_name>
-#        worktree cd <branch_name>
-#        worktree list
-#        worktree ls
-#        worktree prune
-#        worktree remove|rm <branch_name>
+# worktree Fish integration for lfg.
+# Release version: 0.2.0 # x-release-please-version
 
 function _worktree_usage
-    echo "usage: worktree                         (interactive: pick branch/worktree; repo selection only when outside a repo)"
-    echo "       worktree add <branch_name>"
-    echo "       worktree cd <branch_name>"
-    echo "       worktree list"
-    echo "       worktree ls"
-    echo "       worktree prune"
-    echo "       worktree remove|rm <branch_name>"
-    echo ""
-    echo "cd creates the worktree if it does not already exist."
+    echo "usage: worktree                                 (pick branch/worktree interactively)"
+    echo "       worktree add <branch>                    (create or switch to a worktree)"
+    echo "       worktree cd <branch>                     (change to or create a worktree)"
+    echo "       worktree list|ls                         (list worktrees)"
+    echo '       worktree prune                           (remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7}d, or without remote branch)'
+    echo "       worktree remove|rm <branch>              (remove a worktree)"
+    echo "       worktree help                            (show this help)"
 end
 
 function _worktree_require_git_repo

@@ -26,16 +26,6 @@ Options:
                          values like 0.1.0; tags with a leading v are accepted.
   -h, --help             Show this help message
 
-Remote install:
-  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
-  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash -s -- --install-shell fish
-  curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash -s -- --install-version 0.1.0
-
-Local install:
-  ./install.sh
-  ./install.sh --install-dir ~/.local/share/lfg
-  ./install.sh --install-shell oh-my-zsh
-
 The remote installer downloads the latest GitHub release archive by default.
 Remote installs only support github.com/leoxlin/lfg.
 EOF
