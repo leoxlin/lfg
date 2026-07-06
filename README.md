@@ -10,17 +10,22 @@ Jump into a git worktree and start a coding agent.
 
 ## Quick Start
 
-Install:
+1. Install dependencies
 
-```bash
-curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
-```
+   - [fzf](https://github.com/junegunn/fzf)
+   - [git](https://git-scm.com/install/)
 
-Then run:
+2. Install:
 
-```bash
-lfg
-```
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
+   ```
+
+3. Then run:
+
+   ```bash
+   lfg
+   ```
 
 Examples:
 

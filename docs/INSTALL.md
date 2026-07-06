@@ -1,5 +1,20 @@
 # Installation
 
+## Dependencies
+
+Runtime dependencies:
+
+- `git`
+- `fzf`
+- zsh, bash, or fish
+- the agent command you want `lfg` to launch, such as `claude` or `codex`
+
+Installer and update dependencies:
+
+- `bash` to run `install.sh`
+- `curl` for the quick install command and `lfg --update`
+- `tar` for remote release installs
+
 ## Quick Install
 
 ```bash
