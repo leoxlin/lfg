@@ -25,9 +25,6 @@ Options:
   --install-version VER  Remote install release version (default: latest). Use
                          values like 0.1.0; tags with a leading v are accepted.
   -h, --help             Show this help message
-
-The remote installer downloads the latest GitHub release archive by default.
-Remote installs only support github.com/leoxlin/lfg.
 EOF
 }
 
@@ -78,7 +75,7 @@ extract_release_archive() {
 
   tar -xzf "$archive_file" -C "$extract_dir"
 
-  local git_dir source_dir
+  local source_dir
   source_dir="$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d | sort | sed -n '1p')"
   if [ -z "$source_dir" ]; then
     source_dir="$extract_dir"
@@ -87,20 +84,27 @@ extract_release_archive() {
   cp -R "$source_dir"/. "$dest_dir"/
 }
 
+copy_release_tree_from_repo() {
+  local source_dir="$1"
+  local dest_dir="$2"
+
+  mkdir -p "$dest_dir/functions" "$dest_dir/completions"
+  cp -f "$source_dir"/lfg.* "$dest_dir"/
+  cp -f "$source_dir/functions/"* "$dest_dir/functions/"
+  cp -f "$source_dir/completions/"* "$dest_dir/completions/"
+}
+
 reset_install_dir() {
   rm -rf "$INSTALL_DIR"
   mkdir -p "$INSTALL_DIR"
 }
 
-# Fetch the repo files when running remotely.
-fetch_repo() {
+install_release_tree() {
   if [ "$IS_LOCAL" = true ]; then
+    copy_release_tree_from_repo "$REPO_ROOT" "$INSTALL_DIR"
+    REPO_ROOT="$INSTALL_DIR"
     return 0
   fi
-
-  local repo_dir="$INSTALL_DIR/repo"
-  rm -rf "$repo_dir"
-  mkdir -p "$repo_dir"
 
   local release_tag asset_version release_url archive_file extract_dir
 
@@ -112,9 +116,10 @@ fetch_repo() {
 
   echo "Downloading $release_url"
   download_file "$release_url" "$archive_file"
-  extract_release_archive "$archive_file" "$repo_dir" "$extract_dir"
+  extract_release_archive "$archive_file" "$INSTALL_DIR" "$extract_dir"
+  rm -rf "$archive_file" "$extract_dir"
 
-  REPO_ROOT="$repo_dir"
+  REPO_ROOT="$INSTALL_DIR"
 }
 
 add_source_block_to_file() {
@@ -280,9 +285,6 @@ install_source_shell() {
   local config_file="$3"
 
   echo "Installing lfg for $shell_name"
-  mkdir -p "$INSTALL_DIR/completions"
-  cp -f "$REPO_ROOT/$script_name" "$INSTALL_DIR/$script_name"
-  cp -f "$REPO_ROOT/completions/lfg.entrypoints" "$INSTALL_DIR/completions/lfg.entrypoints"
   maybe_add_lfg_source_dir_to_file "$config_file"
   if shell_has_lfg "$shell_name"; then
     echo "lfg is already installed for $shell_name; skipping ${config_file##*/} update"
@@ -294,9 +296,9 @@ install_source_shell() {
 install_fish() {
   echo "Installing lfg for fish"
   mkdir -p "$FISH_CONFIG_DIR/functions" "$FISH_CONFIG_DIR/completions"
-  cp -f "$REPO_ROOT/functions/"*.fish "$FISH_CONFIG_DIR/functions/"
-  cp -f "$REPO_ROOT/completions/"*.fish "$FISH_CONFIG_DIR/completions/"
-  cp -f "$REPO_ROOT/completions/lfg.entrypoints" "$FISH_CONFIG_DIR/completions/lfg.entrypoints"
+  cp -f "$INSTALL_DIR/functions/"*.fish "$FISH_CONFIG_DIR/functions/"
+  cp -f "$INSTALL_DIR/completions/"*.fish "$FISH_CONFIG_DIR/completions/"
+  cp -f "$INSTALL_DIR/completions/lfg.entrypoints" "$FISH_CONFIG_DIR/completions/lfg.entrypoints"
 }
 
 install_oh_my_zsh() {
@@ -304,9 +306,9 @@ install_oh_my_zsh() {
   local zsh_custom="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
   local plugin_dir="$zsh_custom/plugins/lfg"
   mkdir -p "$plugin_dir/completions"
-  cp -f "$REPO_ROOT/lfg.zsh" "$plugin_dir/lfg.zsh"
-  cp -f "$REPO_ROOT/lfg.plugin.zsh" "$plugin_dir/lfg.plugin.zsh"
-  cp -f "$REPO_ROOT/completions/lfg.entrypoints" "$plugin_dir/completions/lfg.entrypoints"
+  cp -f "$INSTALL_DIR/lfg.zsh" "$plugin_dir/lfg.zsh"
+  cp -f "$INSTALL_DIR/lfg.plugin.zsh" "$plugin_dir/lfg.plugin.zsh"
+  cp -f "$INSTALL_DIR/completions/lfg.entrypoints" "$plugin_dir/completions/lfg.entrypoints"
   echo "Plugin installed to $plugin_dir"
   if shell_has_lfg zsh; then
     echo "lfg is already installed for zsh"
@@ -398,7 +400,7 @@ main() {
   check_dependencies
   detect_source
   reset_install_dir
-  fetch_repo
+  install_release_tree
 
   if [ "$METHOD" = "auto" ]; then
     METHOD="$(detect_shell)"

@@ -21,9 +21,7 @@ Installer and update dependencies:
 curl -sSL https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh | bash
 ```
 
-Remote installs download the latest GitHub release archive by default. To
-install a specific release or configure a specific shell, use the options
-documented by `install.sh --help`.
+Use `install.sh --help` to see shell and version options.
 
 ## Local Install
 
@@ -35,32 +33,20 @@ cd lfg-repo
 ./install.sh
 ```
 
-The installer auto-detects the current shell unless a shell override is passed
-with `--install-shell`.
+The installer auto-detects your shell unless you pass `--install-shell`.
 
 ## Re-running the Installer
 
-The installer replaces the install directory on every run before downloading or
-copying files, so stale files from previous installs do not survive
-reinstalling.
+Re-running the installer replaces `~/.config/lfg`, then updates shell config
+only when `lfg` is not already available.
 
-Shell configuration updates remain idempotent. Before modifying any shell
-configuration, the installer runs the target shell and checks whether `lfg` is
-already available. If it is, the installer prints a message and does not modify
-your shell configuration files again.
-
-When configuring zsh or bash and `LFG_SOURCE_DIR` is unset, the installer
-shallowly scans visible folders directly under `$HOME` for a source directory
-containing immediate child git repositories. If it finds one, it prompts before
-adding `export LFG_SOURCE_DIR=<found-dir>` to the shell rc file before the
-`lfg` source line. If it does not find one, it prints a warning with the export
-line to add manually.
+For zsh and bash, the installer may also offer to add `LFG_SOURCE_DIR` if it can
+infer your source directory.
 
 ## Remote Install
 
 `install.sh` can be piped from a URL. Remote installs download the release
-archive from `github.com/leoxlin/lfg`, stage the files under the install
-directory, and install from there.
+archive from `github.com/leoxlin/lfg` into `~/.config/lfg`.
 
 Remote installs only support `github.com/leoxlin/lfg`.
 

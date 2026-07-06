@@ -44,6 +44,20 @@ assert_path_not_exists() {
   fi
 }
 
+assert_install_dir_contains_release_tree() {
+  local install_dir="$1"
+  local message="$2"
+
+  assert_file_exists "$install_dir/lfg.bash" "$message bash script"
+  assert_file_exists "$install_dir/lfg.zsh" "$message zsh script"
+  assert_file_exists "$install_dir/lfg.plugin.zsh" "$message oh-my-zsh plugin"
+  assert_file_exists "$install_dir/functions/lfg.fish" "$message fish function"
+  assert_file_exists "$install_dir/functions/worktree.fish" "$message fish worktree function"
+  assert_file_exists "$install_dir/completions/lfg.entrypoints" "$message entrypoint completions"
+  assert_file_exists "$install_dir/completions/lfg.fish" "$message fish lfg completions"
+  assert_file_exists "$install_dir/completions/worktree.fish" "$message fish worktree completions"
+}
+
 assert_file_contains() {
   local file="$1"
   local expected="$2"
@@ -223,6 +237,8 @@ run_install_auto_detect_case() {
       ;;
   esac
 
+  assert_install_dir_contains_release_tree "$install_dir" "install/$case_name release tree"
+
   echo "ok - install/$case_name"
 }
 
@@ -316,6 +332,8 @@ run_install_idempotent_case() {
       ;;
   esac
 
+  assert_install_dir_contains_release_tree "$install_dir" "install/idempotent-$method release tree"
+
   echo "ok - install/idempotent-$method"
 }
 
@@ -368,7 +386,7 @@ run_install_replaces_install_dir_case() {
     bash "$ROOT/install.sh" "${install_args[@]}" > "$second_output" 2>&1
 
   assert_file_exists "$installed_file" "install/replaces-install-dir-$method copied script"
-  assert_file_exists "$install_dir/completions/lfg.entrypoints" "install/replaces-install-dir-$method copied entrypoint completions"
+  assert_install_dir_contains_release_tree "$install_dir" "install/replaces-install-dir-$method release tree"
   if [ -e "$stale_file" ] || [ -e "$stale_dir" ]; then
     fail "install/replaces-install-dir-$method: expected stale install dir contents to be removed"
   fi
@@ -409,6 +427,7 @@ run_install_source_dir_prompt_case() {
   assert_file_contains "$output_file" "Found source directory: $source_dir" "install/source-dir-prompt found source dir"
   assert_file_contains "$zdotdir/.zshrc" "export LFG_SOURCE_DIR=$source_dir" "install/source-dir-prompt zsh source dir"
   assert_file_contains_before "$zdotdir/.zshrc" "export LFG_SOURCE_DIR=$source_dir" "source \"$install_dir/lfg.zsh\"" "install/source-dir-prompt source dir before lfg source"
+  assert_install_dir_contains_release_tree "$install_dir" "install/source-dir-prompt release tree"
 
   echo "ok - install/source-dir-prompt"
 }
@@ -456,8 +475,9 @@ run_install_remote_release_case() {
     fail "install/remote-release-$case_name failed"
   fi
 
-  assert_file_exists "$install_dir/lfg.zsh" "install/remote-release-$case_name installed zsh script"
-  assert_file_exists "$install_dir/completions/lfg.entrypoints" "install/remote-release-$case_name installed entrypoint completions"
+  assert_install_dir_contains_release_tree "$install_dir" "install/remote-release-$case_name release tree"
+  assert_path_not_exists "$install_dir/repo" "install/remote-release-$case_name does not stage repo under install dir"
+  assert_path_not_exists "$install_dir/release" "install/remote-release-$case_name cleans extract dir"
   assert_file_contains "$curl_log" "$expected_url" "install/remote-release-$case_name downloaded expected release"
 
   echo "ok - install/remote-release-$case_name"
@@ -496,7 +516,7 @@ run_install_dependencies_brew_fzf_case() {
   assert_file_contains "$output_file" "Install it with 'brew install fzf'?" "install/dependencies-brew-fzf prompt"
   assert_file_contains "$brew_log" "install fzf" "install/dependencies-brew-fzf brew command"
   assert_path_not_exists "$stale_file" "install/dependencies-brew-fzf replaces install dir after dependency install"
-  assert_file_exists "$install_dir/lfg.zsh" "install/dependencies-brew-fzf installed zsh script"
+  assert_install_dir_contains_release_tree "$install_dir" "install/dependencies-brew-fzf release tree"
 
   echo "ok - install/dependencies-brew-fzf"
 }
