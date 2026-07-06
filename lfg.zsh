@@ -226,7 +226,7 @@ function _worktree_pick_repo() {
   repo="$(find "$(_worktree_sources_dir)" -mindepth 1 -maxdepth 1 -type d \
       -exec test -e '{}/.git' ';' -print 2>/dev/null \
     | sort \
-    | fzf --prompt='repo> ' --height=40% --reverse \
+    | fzf --border=rounded --border-label=' Select a repo ' --prompt='repo> ' --height=40% --reverse \
         --delimiter=/ --with-nth=-1 $(_worktree_fzf_color_flags))" || return 1
 
   [ -n "$repo" ] || return 1
@@ -238,7 +238,7 @@ function _worktree_pick_branch() {
 
   out="$(git worktree list --porcelain \
     | awk '/^branch / { sub("refs/heads/", "", $2); print $2 }' \
-    | fzf --print-query --prompt='worktree> ' --height=40% --reverse \
+    | fzf --print-query --border=rounded --border-label=' Select or create worktree branch ' --prompt='worktree> ' --height=40% --reverse \
         $(_worktree_fzf_color_flags))"
   code=$?
 

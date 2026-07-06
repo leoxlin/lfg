@@ -17,8 +17,8 @@ Examples:
 
 ## Behavior
 
-- Outside a git repo, `lfg` asks you to pick one from `$LFG_SOURCE_DIR` with `fzf`.
-- When not already inside a linked worktree, `lfg` asks you to pick an existing worktree branch or type a new branch name to create one.
+- Outside a git repo, `lfg` asks you to pick one from `$LFG_SOURCE_DIR` with `fzf`; the selector uses a rounded border labeled `Select a repo` around the `repo> ` prompt.
+- When not already inside a linked worktree, `lfg` asks you to pick an existing worktree branch or type a new branch name to create one; the selector uses a rounded border labeled `Select or create worktree branch` around the `worktree> ` prompt.
 - If already inside a linked worktree, `lfg` launches the agent in the current directory.
 - Otherwise, `lfg` creates or switches to the selected worktree through `worktree`, then launches the agent there.
 - `lfg --help` prints usage and exits without selecting a repo, entering a worktree, or launching an entrypoint.
