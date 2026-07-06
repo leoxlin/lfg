@@ -46,21 +46,28 @@ assert_file_contains() {
   fi
 }
 
-assert_file_contains_before() {
-  local file="$1"
-  local first="$2"
-  local second="$3"
-  local message="$4"
-  local first_line second_line
+skip_if_missing_shell() {
+  local shell="$1"
+  local test_name="$2"
 
-  assert_file_contains "$file" "$first" "$message first marker"
-  assert_file_contains "$file" "$second" "$message second marker"
+  if command -v "$shell" >/dev/null 2>&1; then
+    return 1
+  fi
 
-  first_line="$(grep -Fn "$first" "$file" | sed -n '1s/:.*//p')"
-  second_line="$(grep -Fn "$second" "$file" | sed -n '1s/:.*//p')"
+  echo "skip - $test_name not found"
+  return 0
+}
 
-  if [ "$first_line" -ge "$second_line" ]; then
-    fail "$message: expected '$first' before '$second'"
+dump_output() {
+  local output_file="$1"
+  local stderr_file="${2:-}"
+
+  echo "stdout:" >&2
+  cat "$output_file" >&2 || true
+
+  if [ -n "$stderr_file" ]; then
+    echo "stderr:" >&2
+    cat "$stderr_file" >&2 || true
   fi
 }
 
@@ -164,21 +171,20 @@ setup_repo() {
 }
 
 shell_script_for() {
-  local shell_name="$1"
+  local shell="$1"
   local script="$2"
   local start_dir="$3"
-  local lfg_args="$4"
-  local output_file="$5"
-  local stderr_file="$6"
+  local output_file="${script%/*}/agent.out"
+  local stderr_file="${script%/*}/lfg.err"
 
-  case "$shell_name" in
+  case "$shell" in
     bash)
       cat > "$script" <<EOF
 #!/usr/bin/env bash
 set -o pipefail
 source "$ROOT/lfg.bash" || exit 1
 cd "$start_dir" || exit 1
-lfg fake-agent $lfg_args > "$output_file" 2> "$stderr_file"
+lfg fake-agent > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     zsh)
@@ -188,7 +194,7 @@ emulate -R zsh
 set -o pipefail
 source "$ROOT/lfg.zsh" || exit 1
 cd "$start_dir" || exit 1
-lfg fake-agent $lfg_args > "$output_file" 2> "$stderr_file"
+lfg fake-agent > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     fish)
@@ -198,11 +204,11 @@ source "$ROOT/functions/lfg.fish"
 or exit 1
 cd "$start_dir"
 or exit 1
-lfg fake-agent $lfg_args > "$output_file" 2> "$stderr_file"
+lfg fake-agent > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     *)
-      fail "unknown shell: $shell_name"
+      fail "unknown shell: $shell"
       ;;
   esac
 
@@ -210,34 +216,31 @@ EOF
 }
 
 run_shell_script() {
-  local shell_name="$1"
-  local shell_bin="$2"
-  local script="$3"
+  local shell="$1"
+  local script="$2"
 
-  case "$shell_name" in
-    bash) "$shell_bin" --noprofile --norc "$script" ;;
-    zsh) "$shell_bin" -f "$script" ;;
-    fish) "$shell_bin" --no-config "$script" ;;
-    *) fail "unknown shell: $shell_name" ;;
+  case "$shell" in
+    bash) "$shell" --noprofile --norc "$script" ;;
+    zsh) "$shell" -f "$script" ;;
+    fish) "$shell" --no-config "$script" ;;
+    *) fail "unknown shell: $shell" ;;
   esac
 }
 
 run_lfg_help_case() {
-  local shell_name="$1"
-  local shell_bin="$2"
-  local tmp="$tmp_root/help-$shell_name"
+  local shell="$1"
+  local tmp="$tmp_root/help-$shell"
   local output_file="$tmp/help.out"
   local stderr_file="$tmp/help.err"
-  local script="$tmp/help.$shell_name"
+  local script="$tmp/help.$shell"
 
-  if ! command -v "$shell_bin" >/dev/null 2>&1; then
-    echo "skip - help/$shell_name not found"
+  if skip_if_missing_shell "$shell" "help/$shell"; then
     return 0
   fi
 
   mkdir -p "$tmp"
 
-  case "$shell_name" in
+  case "$shell" in
     bash)
       cat > "$script" <<EOF
 #!/usr/bin/env bash
@@ -264,47 +267,42 @@ lfg --help > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     *)
-      fail "unknown shell: $shell_name"
+      fail "unknown shell: $shell"
       ;;
   esac
 
   chmod +x "$script"
 
-  if ! run_shell_script "$shell_name" "$shell_bin" "$script"; then
-    echo "stdout:" >&2
-    cat "$output_file" >&2 || true
-    echo "stderr:" >&2
-    cat "$stderr_file" >&2 || true
-    fail "help/$shell_name failed"
+  if ! run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "help/$shell failed"
   fi
 
-  assert_file_contains "$output_file" "usage: lfg [entrypoint]" "help/$shell_name usage"
-  assert_file_contains "$output_file" "lfg --update" "help/$shell_name update"
-  assert_file_contains "$output_file" "lfg --help" "help/$shell_name help"
+  assert_file_contains "$output_file" "usage: lfg [entrypoint]" "help/$shell usage"
+  assert_file_contains "$output_file" "lfg --update" "help/$shell update"
+  assert_file_contains "$output_file" "lfg --help" "help/$shell help"
 
   if [ -s "$stderr_file" ]; then
     cat "$stderr_file" >&2 || true
-    fail "help/$shell_name: expected empty stderr"
+    fail "help/$shell: expected empty stderr"
   fi
 
-  echo "ok - help/$shell_name"
+  echo "ok - help/$shell"
 }
 
 run_fzf_pointer_color_case() {
-  local shell_name="$1"
-  local shell_bin="$2"
+  local shell="$1"
   local case_spec case_name pointer_color expected_color
   local tmp source_dir repo bin_dir responses args_log output_file stderr_file script
 
-  if ! command -v "$shell_bin" >/dev/null 2>&1; then
-    echo "skip - fzf-pointer/$shell_name not found"
+  if skip_if_missing_shell "$shell" "fzf-pointer/$shell"; then
     return 0
   fi
 
   for case_spec in "default||bright-blue" "custom|bright-magenta|bright-magenta"; do
     IFS='|' read -r case_name pointer_color expected_color <<< "$case_spec"
 
-    tmp="$tmp_root/fzf-pointer-$case_name-$shell_name"
+    tmp="$tmp_root/fzf-pointer-$case_name-$shell"
     source_dir="$tmp/src"
     repo="$source_dir/repo"
     bin_dir="$tmp/bin"
@@ -312,14 +310,14 @@ run_fzf_pointer_color_case() {
     args_log="$tmp/fzf.args"
     output_file="$tmp/agent.out"
     stderr_file="$tmp/lfg.err"
-    script="$tmp/case.$shell_name"
+    script="$tmp/case.$shell"
 
     mkdir -p "$bin_dir"
     write_fake_fzf "$bin_dir"
     setup_repo "$tmp"
     printf '0|feat/existing\n' > "$responses"
 
-    shell_script_for "$shell_name" "$script" "$repo" "" "$output_file" "$stderr_file"
+    shell_script_for "$shell" "$script" "$repo"
 
     if ! (
         if [ -n "$pointer_color" ]; then
@@ -332,71 +330,62 @@ run_fzf_pointer_color_case() {
           LFG_FZF_RESPONSES="$responses" \
           LFG_FZF_ARGS_LOG="$args_log" \
           FZF_DEFAULT_OPTS="--cycle" \
-          run_shell_script "$shell_name" "$shell_bin" "$script"
+          run_shell_script "$shell" "$script"
       ); then
-        echo "stdout:" >&2
-        cat "$output_file" >&2 || true
-        echo "stderr:" >&2
-        cat "$stderr_file" >&2 || true
-        fail "fzf-pointer/$case_name/$shell_name failed"
+        dump_output "$output_file" "$stderr_file"
+        fail "fzf-pointer/$case_name/$shell failed"
     fi
 
-    assert_file_contains "$args_log" "FZF_DEFAULT_OPTS=--cycle --color=pointer:$expected_color" "fzf-pointer/$case_name/$shell_name pointer color"
+    assert_file_contains "$args_log" "FZF_DEFAULT_OPTS=--cycle --color=pointer:$expected_color" "fzf-pointer/$case_name/$shell pointer color"
 
-    echo "ok - fzf-pointer/$case_name/$shell_name"
+    echo "ok - fzf-pointer/$case_name/$shell"
   done
 }
 
 run_source_dir_requires_repo_case() {
-  local shell_name="$1"
-  local shell_bin="$2"
-  local tmp="$tmp_root/source-dir-requires-repo-$shell_name"
+  local shell="$1"
+  local tmp="$tmp_root/source-dir-requires-repo-$shell"
   local source_dir="$tmp/src"
   local start_dir="$tmp/outside"
   local bin_dir="$tmp/bin"
   local output_file="$tmp/agent.out"
   local stderr_file="$tmp/lfg.err"
-  local script="$tmp/case.$shell_name"
+  local script="$tmp/case.$shell"
 
-  if ! command -v "$shell_bin" >/dev/null 2>&1; then
-    echo "skip - source-dir-requires-repo/$shell_name not found"
+  if skip_if_missing_shell "$shell" "source-dir-requires-repo/$shell"; then
     return 0
   fi
 
   mkdir -p "$source_dir" "$start_dir" "$bin_dir"
   write_fake_fzf "$bin_dir"
-  shell_script_for "$shell_name" "$script" "$start_dir" "" "$output_file" "$stderr_file"
+  shell_script_for "$shell" "$script" "$start_dir"
 
   if PATH="$bin_dir:$ROOT/tests:$PATH" \
       LFG_SOURCE_DIR="$source_dir" \
-      run_shell_script "$shell_name" "$shell_bin" "$script"; then
-    echo "stdout:" >&2
-    cat "$output_file" >&2 || true
-    echo "stderr:" >&2
-    cat "$stderr_file" >&2 || true
-    fail "source-dir-requires-repo/$shell_name unexpectedly succeeded"
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "source-dir-requires-repo/$shell unexpectedly succeeded"
   fi
 
-  assert_file_contains "$stderr_file" "lfg: no git repositories found under $source_dir" "source-dir-requires-repo/$shell_name stderr"
-  assert_file_contains "$stderr_file" "Set LFG_SOURCE_DIR to the folder that contains your cloned git repositories." "source-dir-requires-repo/$shell_name guidance"
+  assert_file_contains "$stderr_file" "lfg: no git repositories found under $source_dir" "source-dir-requires-repo/$shell stderr"
+  assert_file_contains "$stderr_file" "Set LFG_SOURCE_DIR to the folder that contains your cloned git repositories." "source-dir-requires-repo/$shell guidance"
 
-  echo "ok - source-dir-requires-repo/$shell_name"
+  echo "ok - source-dir-requires-repo/$shell"
 }
 
-run_case() {
-  local shell_name="$1"
-  local shell_bin="$2"
-  local context="$3"
-  local target="$4"
-  local tmp="$tmp_root/$shell_name-$context-$target"
+run_lfg_selection_case() {
+  local shell="$1"
+  local context="$2"
+  local target="$3"
+  local tmp="$tmp_root/$shell-$context-$target"
   local source_dir="$tmp/src"
   local repo="$source_dir/repo"
   local bin_dir="$tmp/bin"
   local responses="$tmp/fzf-responses"
   local output_file="$tmp/agent.out"
   local stderr_file="$tmp/lfg.err"
-  local script="$tmp/case.$shell_name"
-  local start_dir branch expected_pwd expected_branch expected_is_worktree lfg_args fzf_code
+  local script="$tmp/case.$shell"
+  local start_dir branch expected_pwd expected_branch expected_is_worktree fzf_code
 
   mkdir -p "$bin_dir"
   write_fake_fzf "$bin_dir"
@@ -406,7 +395,7 @@ run_case() {
     outside) start_dir="$tmp/outside" ;;
     repo) start_dir="$repo" ;;
     worktree) start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo" ;;
-    *) fail "$shell_name/$context/$target: unknown context" ;;
+    *) fail "$shell/$context/$target: unknown context" ;;
   esac
   mkdir -p "$start_dir"
 
@@ -439,76 +428,68 @@ run_case() {
       expected_is_worktree="true"
       fzf_code="0"
       ;;
-    *) fail "$shell_name/$context/$target: unknown target" ;;
+    *) fail "$shell/$context/$target: unknown target" ;;
   esac
 
   : > "$responses"
-  lfg_args=""
   if [ "$context" = "outside" ]; then
     printf '0|%s\n%s|%s\n' "${repo##*/}" "$fzf_code" "$branch" > "$responses"
   elif [ "$context" = "repo" ]; then
     printf '%s|%s\n' "$fzf_code" "$branch" > "$responses"
   fi
 
-  shell_script_for "$shell_name" "$script" "$start_dir" "$lfg_args" "$output_file" "$stderr_file"
+  shell_script_for "$shell" "$script" "$start_dir"
 
   if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
       LFG_SOURCE_DIR="$source_dir" \
       LFG_FZF_RESPONSES="$responses" \
-      run_shell_script "$shell_name" "$shell_bin" "$script"; then
-    echo "stdout:" >&2
-    cat "$output_file" >&2 || true
-    echo "stderr:" >&2
-    cat "$stderr_file" >&2 || true
-    fail "$shell_name/$context/$target failed"
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "$shell/$context/$target failed"
   fi
 
-  assert_eq "$(field pwd "$output_file")" "$expected_pwd" "$shell_name/$context/$target pwd"
-  assert_eq "$(field branch "$output_file")" "$expected_branch" "$shell_name/$context/$target branch"
-  assert_eq "$(field toplevel "$output_file")" "$expected_pwd" "$shell_name/$context/$target toplevel"
-  assert_eq "$(field is_worktree "$output_file")" "$expected_is_worktree" "$shell_name/$context/$target worktree state"
+  assert_eq "$(field pwd "$output_file")" "$expected_pwd" "$shell/$context/$target pwd"
+  assert_eq "$(field branch "$output_file")" "$expected_branch" "$shell/$context/$target branch"
+  assert_eq "$(field toplevel "$output_file")" "$expected_pwd" "$shell/$context/$target toplevel"
+  assert_eq "$(field is_worktree "$output_file")" "$expected_is_worktree" "$shell/$context/$target worktree state"
 
-  echo "ok - $shell_name/$context/$target"
+  echo "ok - $shell/$context/$target"
 }
 
-run_shell_cases() {
-  local shell_name="$1"
-  local shell_bin="$2"
+run_lfg_selection_cases() {
+  local shell="$1"
   local target
 
-  if ! command -v "$shell_bin" >/dev/null 2>&1; then
-    echo "skip - $shell_name not found"
+  if skip_if_missing_shell "$shell" "$shell"; then
     return 0
   fi
 
   for target in main new existing; do
-    run_case "$shell_name" "$shell_bin" "outside" "$target"
-    run_case "$shell_name" "$shell_bin" "repo" "$target"
+    run_lfg_selection_case "$shell" "outside" "$target"
+    run_lfg_selection_case "$shell" "repo" "$target"
   done
 
-  run_case "$shell_name" "$shell_bin" "worktree" "current"
+  run_lfg_selection_case "$shell" "worktree" "current"
 }
 
 run_worktree_setup_hook_case() {
-  local shell_name="$1"
-  local shell_bin="$2"
-  local tmp="$tmp_root/setup-hook-$shell_name"
+  local shell="$1"
+  local tmp="$tmp_root/setup-hook-$shell"
   local source_dir="$tmp/src"
   local repo="$source_dir/repo"
   local hook_log="$tmp/hook.log"
   local output_file="$tmp/hook.out"
   local stderr_file="$tmp/hook.err"
-  local script="$tmp/setup-hook.$shell_name"
+  local script="$tmp/setup-hook.$shell"
   local expected_worktree="$source_dir/.agents/worktrees/repo-feat-existing/repo"
 
-  if ! command -v "$shell_bin" >/dev/null 2>&1; then
-    echo "skip - setup-hook/$shell_name not found"
+  if skip_if_missing_shell "$shell" "setup-hook/$shell"; then
     return 0
   fi
 
   setup_repo "$tmp"
 
-  case "$shell_name" in
+  case "$shell" in
     bash)
       cat > "$script" <<EOF
 #!/usr/bin/env bash
@@ -551,37 +532,32 @@ pwd >> "$output_file"
 EOF
       ;;
     *)
-      fail "unknown shell: $shell_name"
+      fail "unknown shell: $shell"
       ;;
   esac
 
   chmod +x "$script"
 
-  if ! run_shell_script "$shell_name" "$shell_bin" "$script"; then
-    echo "stdout:" >&2
-    cat "$output_file" >&2 || true
-    echo "stderr:" >&2
-    cat "$stderr_file" >&2 || true
-    fail "setup-hook/$shell_name failed"
+  if ! run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "setup-hook/$shell failed"
   fi
 
-  assert_eq "$(cat "$hook_log")" "$expected_worktree" "setup-hook/$shell_name hook path"
-  assert_eq "$(tail -n1 "$output_file")" "$expected_worktree" "setup-hook/$shell_name entered worktree"
+  assert_eq "$(cat "$hook_log")" "$expected_worktree" "setup-hook/$shell hook path"
+  assert_eq "$(tail -n1 "$output_file")" "$expected_worktree" "setup-hook/$shell entered worktree"
 
-  echo "ok - setup-hook/$shell_name"
+  echo "ok - setup-hook/$shell"
 }
 
 run_lfg_completion_file_case() {
-  local shell_name="$1"
-  local shell_bin="$2"
-  local tmp="$tmp_root/completion-file-$shell_name"
+  local shell="$1"
+  local tmp="$tmp_root/completion-file-$shell"
   local completions_file="$tmp/entrypoint-completions.txt"
   local output_file="$tmp/completion.out"
-  local script="$tmp/completion.$shell_name"
+  local script="$tmp/completion.$shell"
   local expected
 
-  if ! command -v "$shell_bin" >/dev/null 2>&1; then
-    echo "skip - completion-file/$shell_name not found"
+  if skip_if_missing_shell "$shell" "completion-file/$shell"; then
     return 0
   fi
 
@@ -593,7 +569,7 @@ run_lfg_completion_file_case() {
     printf 'another-agent extra fields are ignored\n'
   } > "$completions_file"
 
-  case "$shell_name" in
+  case "$shell" in
     bash)
       cat > "$script" <<EOF
 #!/usr/bin/env bash
@@ -620,40 +596,37 @@ __lfg_entrypoint_completions > "$output_file"
 EOF
       ;;
     *)
-      fail "unknown shell: $shell_name"
+      fail "unknown shell: $shell"
       ;;
   esac
 
   chmod +x "$script"
 
-  if ! LFG_COMPLETIONS_FILE="$completions_file" run_shell_script "$shell_name" "$shell_bin" "$script"; then
-    echo "stdout:" >&2
-    cat "$output_file" >&2 || true
-    fail "completion-file/$shell_name failed"
+  if ! LFG_COMPLETIONS_FILE="$completions_file" run_shell_script "$shell" "$script"; then
+    dump_output "$output_file"
+    fail "completion-file/$shell failed"
   fi
 
   expected=$'custom-agent\nanother-agent'
-  assert_eq "$(cat "$output_file")" "$expected" "completion-file/$shell_name entrypoint completions"
+  assert_eq "$(cat "$output_file")" "$expected" "completion-file/$shell entrypoint completions"
 
-  echo "ok - completion-file/$shell_name"
+  echo "ok - completion-file/$shell"
 }
 
 run_lfg_completion_missing_file_case() {
-  local shell_name="$1"
-  local shell_bin="$2"
-  local tmp="$tmp_root/completion-missing-file-$shell_name"
+  local shell="$1"
+  local tmp="$tmp_root/completion-missing-file-$shell"
   local completions_file="$tmp/missing-entrypoint-completions.txt"
   local output_file="$tmp/completion.out"
-  local script="$tmp/completion-missing.$shell_name"
+  local script="$tmp/completion-missing.$shell"
 
-  if ! command -v "$shell_bin" >/dev/null 2>&1; then
-    echo "skip - completion-missing-file/$shell_name not found"
+  if skip_if_missing_shell "$shell" "completion-missing-file/$shell"; then
     return 0
   fi
 
   mkdir -p "$tmp"
 
-  case "$shell_name" in
+  case "$shell" in
     bash)
       cat > "$script" <<EOF
 #!/usr/bin/env bash
@@ -680,21 +653,20 @@ __lfg_entrypoint_completions > "$output_file"; or true
 EOF
       ;;
     *)
-      fail "unknown shell: $shell_name"
+      fail "unknown shell: $shell"
       ;;
   esac
 
   chmod +x "$script"
 
-  if ! LFG_COMPLETIONS_FILE="$completions_file" run_shell_script "$shell_name" "$shell_bin" "$script"; then
-    echo "stdout:" >&2
-    cat "$output_file" >&2 || true
-    fail "completion-missing-file/$shell_name failed"
+  if ! LFG_COMPLETIONS_FILE="$completions_file" run_shell_script "$shell" "$script"; then
+    dump_output "$output_file"
+    fail "completion-missing-file/$shell failed"
   fi
 
-  assert_eq "$(cat "$output_file")" "" "completion-missing-file/$shell_name entrypoint completions"
+  assert_eq "$(cat "$output_file")" "" "completion-missing-file/$shell entrypoint completions"
 
-  echo "ok - completion-missing-file/$shell_name"
+  echo "ok - completion-missing-file/$shell"
 }
 
 run_lfg_update_bash_case() {
@@ -738,10 +710,7 @@ EOF
       LFG_FAKE_INSTALLER="$fake_installer" \
       LFG_UPDATE_CAPTURE="$capture" \
       bash --noprofile --norc "$script"; then
-    echo "stdout:" >&2
-    cat "$output_file" >&2 || true
-    echo "stderr:" >&2
-    cat "$stderr_file" >&2 || true
+    dump_output "$output_file" "$stderr_file"
     fail "lfg/update-bash failed"
   fi
 
@@ -754,35 +723,18 @@ EOF
 }
 
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/lfg-tests.XXXXXX")"
+shells=(bash zsh fish)
+
+for shell in "${shells[@]}"; do
+  run_lfg_selection_cases "$shell"
+  run_source_dir_requires_repo_case "$shell"
+  run_worktree_setup_hook_case "$shell"
+  run_lfg_completion_file_case "$shell"
+  run_lfg_completion_missing_file_case "$shell"
+  run_lfg_help_case "$shell"
+  run_fzf_pointer_color_case "$shell"
+done
 
 run_lfg_update_bash_case
-
-run_lfg_help_case "bash" "bash"
-run_lfg_help_case "zsh" "zsh"
-run_lfg_help_case "fish" "fish"
-
-run_fzf_pointer_color_case "bash" "bash"
-run_fzf_pointer_color_case "zsh" "zsh"
-run_fzf_pointer_color_case "fish" "fish"
-
-run_source_dir_requires_repo_case "bash" "bash"
-run_source_dir_requires_repo_case "zsh" "zsh"
-run_source_dir_requires_repo_case "fish" "fish"
-
-run_lfg_completion_file_case "bash" "bash"
-run_lfg_completion_file_case "zsh" "zsh"
-run_lfg_completion_file_case "fish" "fish"
-
-run_lfg_completion_missing_file_case "bash" "bash"
-run_lfg_completion_missing_file_case "zsh" "zsh"
-run_lfg_completion_missing_file_case "fish" "fish"
-
-run_worktree_setup_hook_case "bash" "bash"
-run_worktree_setup_hook_case "zsh" "zsh"
-run_worktree_setup_hook_case "fish" "fish"
-
-run_shell_cases "bash" "bash"
-run_shell_cases "zsh" "zsh"
-run_shell_cases "fish" "fish"
 
 echo "ok - lfg tests complete"
