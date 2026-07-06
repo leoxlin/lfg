@@ -1,5 +1,5 @@
 # worktree: worktree helper for lfg.
-# Release version: 0.2.0 # x-release-please-version
+# Release version: 0.3.0 # x-release-please-version
 #
 # Usage: worktree                         (interactive: pick branch/worktree)
 #        worktree add <branch_name>

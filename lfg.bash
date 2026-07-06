@@ -1,5 +1,5 @@
 # lfg: jump into a worktree and start an agent.
-# Release version: 0.2.0 # x-release-please-version
+# Release version: 0.3.0 # x-release-please-version
 #
 # Usage: lfg [entrypoint]
 #
