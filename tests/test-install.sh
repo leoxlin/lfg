@@ -176,8 +176,8 @@ done
 printf '%s\n' "$url" >> "$LFG_FAKE_CURL_LOG"
 
 case "$url" in
-  https://api.github.com/repos/leoxlin/lfg/releases/latest)
-    echo '{"tag_name":"v2.0.0"}'
+  https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.tar.gz)
+    cp "$LFG_RELEASE_ARCHIVE_DIR/lfg-latest.tar.gz" "$output"
     ;;
   https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.tar.gz)
     cp "$LFG_RELEASE_ARCHIVE_DIR/lfg-2.0.0.tar.gz" "$output"
@@ -477,6 +477,7 @@ run_install_remote_release_case() {
   write_fake_fzf "$bin_dir"
 
   LFG_DIST_DIR="$archive_dir" "$ROOT/scripts/release.sh" 2.0.0 >/dev/null
+  LFG_DIST_DIR="$archive_dir" "$ROOT/scripts/release.sh" latest >/dev/null
 
   env_args=(
     "HOME=$home"
@@ -503,10 +504,6 @@ run_install_remote_release_case() {
   assert_path_not_exists "$install_dir/repo" "install/remote-release-$case_name does not stage repo under install dir"
   assert_path_not_exists "$install_dir/release" "install/remote-release-$case_name cleans extract dir"
   assert_file_contains "$curl_log" "$expected_url" "install/remote-release-$case_name downloaded expected release"
-
-  if [ -z "$release_version" ]; then
-    assert_file_contains "$curl_log" "https://api.github.com/repos/leoxlin/lfg/releases/latest" "install/remote-release-$case_name resolved latest release"
-  fi
 
   echo "ok - install/remote-release-$case_name"
 }
@@ -641,7 +638,7 @@ run_install_cases() {
 
   run_install_source_dir_prompt_case
 
-  run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.tar.gz"
+  run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.tar.gz"
   run_install_remote_release_case "specific" "v2.0.0" "https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.tar.gz"
 
   for removed_arg in --zsh --bash --fish --oh-my-zsh --repo-url --repo-ref; do
