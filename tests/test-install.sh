@@ -58,6 +58,18 @@ assert_install_dir_contains_release_tree() {
   assert_file_exists "$install_dir/completions/worktree.fish" "$message fish worktree completions"
 }
 
+assert_output_installs_release_tree() {
+  local output_file="$1"
+  local install_dir="$2"
+  local message="$3"
+
+  assert_file_contains "$output_file" "Installed $install_dir/lfg.bash" "$message installed bash script"
+  assert_file_contains "$output_file" "Installed $install_dir/lfg.zsh" "$message installed zsh script"
+  assert_file_contains "$output_file" "Installed $install_dir/lfg.plugin.zsh" "$message installed plugin script"
+  assert_file_contains "$output_file" "Installed $install_dir/functions/lfg.fish" "$message installed fish function"
+  assert_file_contains "$output_file" "Installed $install_dir/completions/lfg.entrypoints" "$message installed entrypoint completions"
+}
+
 assert_file_contains() {
   local file="$1"
   local expected="$2"
@@ -238,6 +250,17 @@ run_install_auto_detect_case() {
   esac
 
   assert_install_dir_contains_release_tree "$install_dir" "install/$case_name release tree"
+  assert_output_installs_release_tree "$output_file" "$install_dir" "install/$case_name output"
+  case "$expected_method" in
+    fish)
+      assert_file_contains "$output_file" "Installed $xdg_config_home/fish/functions/lfg.fish" "install/$case_name output fish function"
+      assert_file_contains "$output_file" "Installed $xdg_config_home/fish/completions/lfg.fish" "install/$case_name output fish completion"
+      ;;
+    oh-my-zsh)
+      assert_file_contains "$output_file" "Installed $home/.oh-my-zsh/custom/plugins/lfg/lfg.zsh" "install/$case_name output oh-my-zsh script"
+      assert_file_contains "$output_file" "Installed $home/.oh-my-zsh/custom/plugins/lfg/lfg.plugin.zsh" "install/$case_name output oh-my-zsh plugin"
+      ;;
+  esac
 
   echo "ok - install/$case_name"
 }
@@ -333,6 +356,7 @@ run_install_idempotent_case() {
   esac
 
   assert_install_dir_contains_release_tree "$install_dir" "install/idempotent-$method release tree"
+  assert_output_installs_release_tree "$second_output" "$install_dir" "install/idempotent-$method output"
 
   echo "ok - install/idempotent-$method"
 }
@@ -476,6 +500,7 @@ run_install_remote_release_case() {
   fi
 
   assert_install_dir_contains_release_tree "$install_dir" "install/remote-release-$case_name release tree"
+  assert_output_installs_release_tree "$output_file" "$install_dir" "install/remote-release-$case_name output"
   assert_path_not_exists "$install_dir/repo" "install/remote-release-$case_name does not stage repo under install dir"
   assert_path_not_exists "$install_dir/release" "install/remote-release-$case_name cleans extract dir"
   assert_file_contains "$curl_log" "$expected_url" "install/remote-release-$case_name downloaded expected release"

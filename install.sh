@@ -81,17 +81,27 @@ extract_release_archive() {
     source_dir="$extract_dir"
   fi
 
-  cp -R "$source_dir"/. "$dest_dir"/
+  copy_release_tree_from_repo "$source_dir" "$dest_dir"
+}
+
+install_file() {
+  local source_file="$1"
+  local dest_file="$2"
+
+  mkdir -p "$(dirname "$dest_file")"
+  cp -f "$source_file" "$dest_file"
+  echo "Installed $dest_file"
 }
 
 copy_release_tree_from_repo() {
   local source_dir="$1"
   local dest_dir="$2"
+  local source_file relative_file
 
-  mkdir -p "$dest_dir/functions" "$dest_dir/completions"
-  cp -f "$source_dir"/lfg.* "$dest_dir"/
-  cp -f "$source_dir/functions/"* "$dest_dir/functions/"
-  cp -f "$source_dir/completions/"* "$dest_dir/completions/"
+  while IFS= read -r source_file; do
+    relative_file="${source_file#$source_dir/}"
+    install_file "$source_file" "$dest_dir/$relative_file"
+  done < <(find "$source_dir" -type f \( -name 'lfg.*' -o -path "$source_dir/functions/*" -o -path "$source_dir/completions/*" \) | sort)
 }
 
 reset_install_dir() {
@@ -295,20 +305,29 @@ install_source_shell() {
 
 install_fish() {
   echo "Installing lfg for fish"
-  mkdir -p "$FISH_CONFIG_DIR/functions" "$FISH_CONFIG_DIR/completions"
-  cp -f "$INSTALL_DIR/functions/"*.fish "$FISH_CONFIG_DIR/functions/"
-  cp -f "$INSTALL_DIR/completions/"*.fish "$FISH_CONFIG_DIR/completions/"
-  cp -f "$INSTALL_DIR/completions/lfg.entrypoints" "$FISH_CONFIG_DIR/completions/lfg.entrypoints"
+  local source_file
+
+  for source_file in "$INSTALL_DIR/functions/"*.fish; do
+    install_file "$source_file" "$FISH_CONFIG_DIR/functions/${source_file##*/}"
+  done
+  for source_file in "$INSTALL_DIR/completions/"*.fish; do
+    install_file "$source_file" "$FISH_CONFIG_DIR/completions/${source_file##*/}"
+  done
+  install_file "$INSTALL_DIR/completions/lfg.entrypoints" "$FISH_CONFIG_DIR/completions/lfg.entrypoints"
+}
+
+oh_my_zsh_plugin_dir() {
+  local zsh_custom="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+  echo "$zsh_custom/plugins/lfg"
 }
 
 install_oh_my_zsh() {
   echo "Installing lfg as an Oh My Zsh plugin"
-  local zsh_custom="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
-  local plugin_dir="$zsh_custom/plugins/lfg"
-  mkdir -p "$plugin_dir/completions"
-  cp -f "$INSTALL_DIR/lfg.zsh" "$plugin_dir/lfg.zsh"
-  cp -f "$INSTALL_DIR/lfg.plugin.zsh" "$plugin_dir/lfg.plugin.zsh"
-  cp -f "$INSTALL_DIR/completions/lfg.entrypoints" "$plugin_dir/completions/lfg.entrypoints"
+  local plugin_dir
+  plugin_dir="$(oh_my_zsh_plugin_dir)"
+  install_file "$INSTALL_DIR/lfg.zsh" "$plugin_dir/lfg.zsh"
+  install_file "$INSTALL_DIR/lfg.plugin.zsh" "$plugin_dir/lfg.plugin.zsh"
+  install_file "$INSTALL_DIR/completions/lfg.entrypoints" "$plugin_dir/completions/lfg.entrypoints"
   echo "Plugin installed to $plugin_dir"
   if shell_has_lfg zsh; then
     echo "lfg is already installed for zsh"

@@ -38,7 +38,8 @@ The installer auto-detects your shell unless you pass `--install-shell`.
 ## Re-running the Installer
 
 Re-running the installer replaces `~/.config/lfg`, then updates shell config
-only when `lfg` is not already available.
+only when `lfg` is not already available. Each run prints files as it installs
+them.
 
 For zsh and bash, the installer may also offer to add `LFG_SOURCE_DIR` if it can
 infer your source directory.
