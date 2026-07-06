@@ -215,22 +215,38 @@ function _worktree_enter() {
   cd "$worktree_path" || return 1
 }
 
-function _worktree_fzf_color_flags() {
-  local color="${LFG_FZF_HIGHLIGHT_COLOR:-green}"
-  echo "--color=hl:${color},hl+:${color}"
+function _worktree_fzf() {
+  if [ "$#" -ne 2 ]; then
+    echo "_worktree_fzf requires a label and prompt" >&2
+    return 2
+  fi
+
+  local label="$1"
+  local prompt="$2"
+  local color="${LFG_FZF_POINTER_COLOR:-bright-blue}"
+  local opts="--color=pointer:${color}"
+
+  if [ -n "${FZF_DEFAULT_OPTS:-}" ]; then
+    opts="${FZF_DEFAULT_OPTS} ${opts}"
+  fi
+
+  FZF_DEFAULT_OPTS="$opts" fzf --print-query --border=rounded --border-label="$label" --prompt="$prompt" --height=40% --reverse
 }
 
 function _worktree_pick_repo() {
-  local repo
+  local out code repo_name
 
-  repo="$(find "$(_worktree_sources_dir)" -mindepth 1 -maxdepth 1 -type d \
+  out="$(find "$(_worktree_sources_dir)" -mindepth 1 -maxdepth 1 -type d \
       -exec test -e '{}/.git' ';' -print 2>/dev/null \
+    | while IFS= read -r repo; do basename "$repo"; done \
     | sort \
-    | fzf --border=rounded --border-label=' Select a repo ' --prompt='repo> ' --height=40% --reverse \
-        --delimiter=/ --with-nth=-1 $(_worktree_fzf_color_flags))" || return 1
+    | _worktree_fzf ' Select a repo ' 'repo> ')"
+  code=$?
+  [ "$code" -eq 0 ] || return 1
 
-  [ -n "$repo" ] || return 1
-  echo "$repo"
+  repo_name="$(printf '%s\n' "$out" | tail -n1)"
+  [ -n "$repo_name" ] || return 1
+  echo "$(_worktree_sources_dir)/$repo_name"
 }
 
 function _worktree_pick_branch() {
@@ -238,8 +254,7 @@ function _worktree_pick_branch() {
 
   out="$(git worktree list --porcelain \
     | awk '/^branch / { sub("refs/heads/", "", $2); print $2 }' \
-    | fzf --print-query --border=rounded --border-label=' Select or create worktree branch ' --prompt='worktree> ' --height=40% --reverse \
-        $(_worktree_fzf_color_flags))"
+    | _worktree_fzf ' Select or create worktree branch ' 'worktree> ')"
   code=$?
 
   # 0 = picked existing, 1 = no match (create new); anything else = aborted.

@@ -154,27 +154,52 @@ function _worktree_enter
     or return 1
 end
 
-function _worktree_fzf_color_flags
-    if set -q LFG_FZF_HIGHLIGHT_COLOR
-        echo --color=hl:$LFG_FZF_HIGHLIGHT_COLOR,hl+:$LFG_FZF_HIGHLIGHT_COLOR
-    else
-        echo --color=hl:green,hl+:green
+function _worktree_fzf
+    if test (count $argv) -ne 2
+        echo "_worktree_fzf requires a label and prompt" >&2
+        return 2
     end
+
+    set -l label $argv[1]
+    set -l prompt $argv[2]
+    set -l color bright-blue
+    if set -q LFG_FZF_POINTER_COLOR
+        set color $LFG_FZF_POINTER_COLOR
+    end
+
+    set -l opts "--color=pointer:$color"
+    if set -q FZF_DEFAULT_OPTS
+        set opts "$FZF_DEFAULT_OPTS $opts"
+    end
+    set -lx FZF_DEFAULT_OPTS "$opts"
+
+    fzf --print-query --border=rounded --border-label="$label" --prompt="$prompt" --height=40% --reverse
 end
 
 function _worktree_pick_repo
-    find "$(_worktree_sources_dir)" -mindepth 1 -maxdepth 1 -type d \
+    set -l out (find "$(_worktree_sources_dir)" -mindepth 1 -maxdepth 1 -type d \
         -exec test -e '{}/.git' ';' -print 2>/dev/null \
+        | while read -l repo
+            basename "$repo"
+        end \
         | sort \
-        | fzf --border=rounded --border-label=' Select a repo ' --prompt='repo> ' --height=40% --reverse \
-            --delimiter=/ --with-nth=-1 (_worktree_fzf_color_flags)
+        | _worktree_fzf ' Select a repo ' 'repo> ')
+    set -l code $status
+    if test $code -ne 0
+        return 1
+    end
+
+    set -l repo_name (printf '%s\n' $out | tail -n1)
+    if test -z "$repo_name"
+        return 1
+    end
+    echo "$(_worktree_sources_dir)/$repo_name"
 end
 
 function _worktree_pick_branch
     set -l out (git worktree list --porcelain \
         | awk '/^branch / { sub("refs/heads/", "", $2); print $2 }' \
-        | fzf --print-query --border=rounded --border-label=' Select or create worktree branch ' --prompt='worktree> ' --height=40% --reverse \
-            (_worktree_fzf_color_flags))
+        | _worktree_fzf ' Select or create worktree branch ' 'worktree> ')
     set -l code $status
 
     # 0 = picked existing, 1 = no match (create new); anything else = aborted.

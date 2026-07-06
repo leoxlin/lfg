@@ -41,7 +41,7 @@ assert_file_contains() {
   local message="$3"
 
   assert_file_exists "$file" "$message"
-  if ! grep -Fq "$expected" "$file"; then
+  if ! grep -Fq -- "$expected" "$file"; then
     fail "$message: expected $file to contain '$expected'"
   fi
 }
@@ -79,6 +79,11 @@ write_fake_fzf() {
 set -euo pipefail
 
 : "${LFG_FZF_RESPONSES:?LFG_FZF_RESPONSES must point to queued fake fzf responses}"
+
+if [ -n "${LFG_FZF_ARGS_LOG:-}" ]; then
+  printf 'FZF_DEFAULT_OPTS=%s\n' "${FZF_DEFAULT_OPTS:-}" >> "$LFG_FZF_ARGS_LOG"
+  printf '%s\n' "$*" >> "$LFG_FZF_ARGS_LOG"
+fi
 
 cat >/dev/null
 
@@ -604,6 +609,63 @@ EOF
   echo "ok - help/$shell_name"
 }
 
+run_fzf_pointer_color_case() {
+  local shell_name="$1"
+  local shell_bin="$2"
+  local case_spec case_name pointer_color expected_color
+  local tmp source_dir repo bin_dir responses args_log output_file stderr_file script
+
+  if ! command -v "$shell_bin" >/dev/null 2>&1; then
+    echo "skip - fzf-pointer/$shell_name not found"
+    return 0
+  fi
+
+  for case_spec in "default||bright-blue" "custom|bright-magenta|bright-magenta"; do
+    IFS='|' read -r case_name pointer_color expected_color <<< "$case_spec"
+
+    tmp="$tmp_root/fzf-pointer-$case_name-$shell_name"
+    source_dir="$tmp/src"
+    repo="$source_dir/repo"
+    bin_dir="$tmp/bin"
+    responses="$tmp/fzf-responses"
+    args_log="$tmp/fzf.args"
+    output_file="$tmp/agent.out"
+    stderr_file="$tmp/lfg.err"
+    script="$tmp/case.$shell_name"
+
+    mkdir -p "$bin_dir"
+    write_fake_fzf "$bin_dir"
+    setup_repo "$tmp"
+    printf '0|feat/existing\n' > "$responses"
+
+    shell_script_for "$shell_name" "$script" "$repo" "" "$output_file" "$stderr_file"
+
+    if ! (
+        if [ -n "$pointer_color" ]; then
+          export LFG_FZF_POINTER_COLOR="$pointer_color"
+        else
+          unset LFG_FZF_POINTER_COLOR
+        fi
+        PATH="$bin_dir:$ROOT/tests:$PATH" \
+          LFG_SOURCE_DIR="$source_dir" \
+          LFG_FZF_RESPONSES="$responses" \
+          LFG_FZF_ARGS_LOG="$args_log" \
+          FZF_DEFAULT_OPTS="--cycle" \
+          run_shell_script "$shell_name" "$shell_bin" "$script"
+      ); then
+        echo "stdout:" >&2
+        cat "$output_file" >&2 || true
+        echo "stderr:" >&2
+        cat "$stderr_file" >&2 || true
+        fail "fzf-pointer/$case_name/$shell_name failed"
+    fi
+
+    assert_file_contains "$args_log" "FZF_DEFAULT_OPTS=--cycle --color=pointer:$expected_color" "fzf-pointer/$case_name/$shell_name pointer color"
+
+    echo "ok - fzf-pointer/$case_name/$shell_name"
+  done
+}
+
 run_case() {
   local shell_name="$1"
   local shell_bin="$2"
@@ -666,7 +728,7 @@ run_case() {
   : > "$responses"
   lfg_args=""
   if [ "$context" = "outside" ]; then
-    printf '0|%s\n%s|%s\n' "$repo" "$fzf_code" "$branch" > "$responses"
+    printf '0|%s\n%s|%s\n' "${repo##*/}" "$fzf_code" "$branch" > "$responses"
   elif [ "$context" = "repo" ]; then
     printf '%s|%s\n' "$fzf_code" "$branch" > "$responses"
   fi
@@ -983,6 +1045,10 @@ run_lfg_update_bash_case
 run_lfg_help_case "bash" "bash"
 run_lfg_help_case "zsh" "zsh"
 run_lfg_help_case "fish" "fish"
+
+run_fzf_pointer_color_case "bash" "bash"
+run_fzf_pointer_color_case "zsh" "zsh"
+run_fzf_pointer_color_case "fish" "fish"
 
 run_lfg_completion_file_case "bash" "bash"
 run_lfg_completion_file_case "zsh" "zsh"
