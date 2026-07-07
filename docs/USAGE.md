@@ -175,7 +175,9 @@ function lfg_worktree_setup
 end
 ```
 
-## Related Docs
+## Starship prompt
 
-- [Installation](INSTALL.md)
-- [Release](RELEASE.md)
+You can reference [my starship config](https://github.com/leoxlin/homebase/blob/main/starship/starship.toml) if
+you'd like to use how I display worktrees within the shell prompt.
+
+![starship](starship.png)
