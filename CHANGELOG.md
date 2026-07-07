@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/leoxlin/lfg/compare/v0.4.1...v0.5.0) (2026-07-07)
+
+
+### Features
+
+* create version command ([c1db15d](https://github.com/leoxlin/lfg/commit/c1db15d861ed5f54af295cb86fd08f5cbed01938))
+
 ## [0.4.1](https://github.com/leoxlin/lfg/compare/v0.4.0...v0.4.1) (2026-07-06)
 
 

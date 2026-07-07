@@ -1,5 +1,5 @@
 # Oh-My-Zsh plugin entry point for lfg.
-# Release version: 0.4.1 # x-release-please-version
+# Release version: 0.5.0 # x-release-please-version
 #
 # Place this repository (or a copy/symlink of it) in:
 #   ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/lfg
