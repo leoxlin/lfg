@@ -2,6 +2,8 @@
 
 Jump into a git worktree and start a coding agent.
 
+![demo](docs/demo.gif)
+
 ## Quick Start
 
 1. Install dependencies [fzf](https://github.com/junegunn/fzf) and [git](https://git-scm.com/install/)
