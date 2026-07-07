@@ -6,6 +6,7 @@ set -g __lfg_completion_dir (status dirname)
 complete -c lfg -f
 
 complete -c lfg -n '__fish_is_first_token' -a '--update' -d 'update the lfg plugin to latest'
+complete -c lfg -n '__fish_is_first_token' -a '--version' -d 'show the installed lfg version'
 complete -c lfg -n '__fish_is_first_token' -a '--help' -d 'show lfg usage'
 
 function __lfg_completions_file

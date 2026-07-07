@@ -44,6 +44,22 @@ assert_path_not_exists() {
   fi
 }
 
+assert_symlink_points_to() {
+  local symlink="$1"
+  local expected_target="$2"
+  local message="$3"
+  local actual_target
+
+  if [ ! -L "$symlink" ]; then
+    fail "$message: expected $symlink to be a symlink"
+  fi
+
+  actual_target="$(readlink "$symlink")"
+  if [ "$actual_target" != "$expected_target" ]; then
+    fail "$message: expected $symlink -> $expected_target, got $actual_target"
+  fi
+}
+
 assert_install_dir_contains_release_tree() {
   local install_dir="$1"
   local message="$2"
@@ -56,6 +72,7 @@ assert_install_dir_contains_release_tree() {
   assert_file_exists "$install_dir/completions/lfg.entrypoints" "$message entrypoint completions"
   assert_file_exists "$install_dir/completions/lfg.fish" "$message fish lfg completions"
   assert_file_exists "$install_dir/completions/worktree.fish" "$message fish worktree completions"
+  assert_file_exists "$install_dir/VERSION" "$message VERSION file"
 }
 
 assert_output_installs_release_tree() {
@@ -68,6 +85,7 @@ assert_output_installs_release_tree() {
   assert_file_contains "$output_file" "Installed: $install_dir/lfg.plugin.zsh" "$message installed plugin script"
   assert_file_contains "$output_file" "Installed: $install_dir/functions/lfg.fish" "$message installed fish function"
   assert_file_contains "$output_file" "Installed: $install_dir/completions/lfg.entrypoints" "$message installed entrypoint completions"
+  assert_file_contains "$output_file" "Installed: $install_dir/VERSION" "$message installed VERSION file"
 }
 
 assert_file_contains() {
@@ -236,8 +254,11 @@ run_install_auto_detect_case() {
       ;;
     fish)
       assert_file_exists "$xdg_config_home/fish/functions/lfg.fish" "install/$case_name fish function"
+      assert_symlink_points_to "$xdg_config_home/fish/functions/lfg.fish" "$install_dir/functions/lfg.fish" "install/$case_name fish function symlink"
       assert_file_exists "$xdg_config_home/fish/completions/lfg.fish" "install/$case_name fish completion"
+      assert_symlink_points_to "$xdg_config_home/fish/completions/lfg.fish" "$install_dir/completions/lfg.fish" "install/$case_name fish completion symlink"
       assert_file_exists "$xdg_config_home/fish/completions/lfg.entrypoints" "install/$case_name fish entrypoint completions"
+      assert_symlink_points_to "$xdg_config_home/fish/completions/lfg.entrypoints" "$install_dir/completions/lfg.entrypoints" "install/$case_name fish entrypoint symlink"
       ;;
     oh-my-zsh)
       assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.zsh" "install/$case_name oh-my-zsh script"
@@ -345,8 +366,11 @@ run_install_idempotent_case() {
       ;;
     fish)
       assert_file_exists "$xdg_config_home/fish/functions/lfg.fish" "install/idempotent-$method fish function"
+      assert_symlink_points_to "$xdg_config_home/fish/functions/lfg.fish" "$install_dir/functions/lfg.fish" "install/idempotent-$method fish function symlink"
       assert_file_exists "$xdg_config_home/fish/completions/lfg.fish" "install/idempotent-$method fish completion"
+      assert_symlink_points_to "$xdg_config_home/fish/completions/lfg.fish" "$install_dir/completions/lfg.fish" "install/idempotent-$method fish completion symlink"
       assert_file_exists "$xdg_config_home/fish/completions/lfg.entrypoints" "install/idempotent-$method fish entrypoint completions"
+      assert_symlink_points_to "$xdg_config_home/fish/completions/lfg.entrypoints" "$install_dir/completions/lfg.entrypoints" "install/idempotent-$method fish entrypoint symlink"
       ;;
     oh-my-zsh)
       assert_file_exists "$home/.oh-my-zsh/custom/plugins/lfg/lfg.zsh" "install/idempotent-$method oh-my-zsh script"
@@ -456,6 +480,34 @@ run_install_source_dir_prompt_case() {
   echo "ok - install/source-dir-prompt"
 }
 
+run_install_local_version_case() {
+  local tmp="$tmp_root/install-local-version"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local bin_dir="$tmp/bin"
+  local output_file="$tmp/install.out"
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
+  write_fake_fzf "$bin_dir"
+
+  if ! HOME="$home" \
+      ZDOTDIR="$zdotdir" \
+      XDG_CONFIG_HOME="$xdg_config_home" \
+      PATH="$bin_dir:$PATH" \
+      bash "$ROOT/install.sh" --install-dir "$install_dir" --install-shell zsh > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/local-version failed"
+  fi
+
+  assert_install_dir_contains_release_tree "$install_dir" "install/local-version release tree"
+  assert_file_contains "$install_dir/VERSION" "local" "install/local-version VERSION content"
+  assert_file_contains "$output_file" "Installed: $install_dir/VERSION" "install/local-version output VERSION"
+
+  echo "ok - install/local-version"
+}
+
 run_install_remote_release_case() {
   local case_name="$1"
   local release_version="$2"
@@ -499,11 +551,15 @@ run_install_remote_release_case() {
     fail "install/remote-release-$case_name failed"
   fi
 
+  local expected_version="${release_version:-latest}"
+  expected_version="${expected_version#v}"
+
   assert_install_dir_contains_release_tree "$install_dir" "install/remote-release-$case_name release tree"
   assert_output_installs_release_tree "$output_file" "$install_dir" "install/remote-release-$case_name output"
   assert_path_not_exists "$install_dir/repo" "install/remote-release-$case_name does not stage repo under install dir"
   assert_path_not_exists "$install_dir/release" "install/remote-release-$case_name cleans extract dir"
   assert_file_contains "$curl_log" "$expected_url" "install/remote-release-$case_name downloaded expected release"
+  assert_file_contains "$install_dir/VERSION" "$expected_version" "install/remote-release-$case_name VERSION content"
 
   echo "ok - install/remote-release-$case_name"
 }
@@ -637,6 +693,8 @@ run_install_cases() {
   run_install_replaces_install_dir_case "bash" "bash"
 
   run_install_source_dir_prompt_case
+
+  run_install_local_version_case
 
   run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.tar.gz"
   run_install_remote_release_case "specific" "v2.0.0" "https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.tar.gz"

@@ -44,9 +44,27 @@ function _lfg_update
     return $update_status
 end
 
+function _lfg_version
+    set -l script_path (status filename)
+    if test -L "$script_path"
+        set script_path (readlink "$script_path")
+    end
+    set -l install_dir (dirname (dirname "$script_path"))
+
+    set -l version_file "$install_dir/VERSION"
+    set -l installed_version unknown
+
+    if test -r "$version_file"
+        set installed_version (cat "$version_file")
+    end
+
+    echo "lfg $installed_version"
+end
+
 function _lfg_usage
     echo "usage: lfg [entrypoint]     (navigate to a worktree and start entrypoint, e.g. codex)"
     echo "       lfg --update         (update the lfg plugin to latest)"
+    echo "       lfg --version        (show the installed lfg version)"
     echo "       lfg --help           (show this help)"
 end
 
@@ -58,6 +76,11 @@ function lfg
 
     if set -q argv[1]; and test "$argv[1]" = --update
         _lfg_update
+        return
+    end
+
+    if set -q argv[1]; and test "$argv[1]" = --version
+        _lfg_version
         return
     end
 

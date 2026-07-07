@@ -3,6 +3,7 @@
 ```text
 lfg [entrypoint]     (navigate to a worktree and start entrypoint, e.g. codex)
 lfg --update         (update the lfg plugin to latest)
+lfg --version        (show the installed lfg version)
 lfg --help           (show this help)
 ```
 
@@ -32,6 +33,7 @@ worktree cd <branch>                     (change to or create a worktree)
 worktree list|ls                         (list worktrees)
 worktree prune                           (remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7} day(s), or without remote branch)
 worktree remove|rm <branch>              (remove a worktree)
+worktree version                         (show the installed worktree version)
 worktree help                            (show this help)
 ```
 
@@ -66,6 +68,7 @@ Options:
 
 - `--help`
 - `--update`
+- `--version`
 
 Bundled entrypoint completions:
 

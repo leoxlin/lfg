@@ -165,6 +165,16 @@ install_file() {
   logger "INFO" "Installed: $dest_file"
 }
 
+install_symlink() {
+  local source_file="$1"
+  local dest_file="$2"
+
+  mkdir -p "$(dirname "$dest_file")"
+  rm -f "$dest_file"
+  ln -s "$source_file" "$dest_file"
+  logger "INFO" "Installed: $dest_file"
+}
+
 copy_release_tree_from_repo() {
   local source_dir="$1"
   local dest_dir="$2"
@@ -174,7 +184,7 @@ copy_release_tree_from_repo() {
   while IFS= read -r source_file; do
     relative_file="${source_file#$source_dir/}"
     install_file "$source_file" "$dest_dir/$relative_file"
-  done < <(find "$source_dir" -type f \( -name 'lfg.*' -o -path "$source_dir/functions/*" -o -path "$source_dir/completions/*" \) | sort)
+  done < <(find "$source_dir" -type f \( -name 'lfg.*' -o -path "$source_dir/functions/*" -o -path "$source_dir/completions/*" -o -name 'VERSION' \) | sort)
   logger "INFO" "Copied release files to: $dest_dir"
 }
 
@@ -189,6 +199,8 @@ install_release_tree() {
   if [ "$IS_LOCAL" = true ]; then
     logger "INFO" "Installing release tree from local repository"
     copy_release_tree_from_repo "$REPO_ROOT" "$INSTALL_DIR"
+    printf '%s\n' "local" > "$INSTALL_DIR/VERSION"
+    logger "INFO" "Installed: $INSTALL_DIR/VERSION"
     REPO_ROOT="$INSTALL_DIR"
     return 0
   fi
@@ -412,18 +424,18 @@ install_fish() {
   logger "INFO" "Installing fish functions to: $FISH_CONFIG_DIR/functions"
   for source_file in "$INSTALL_DIR/functions/"*.fish; do
     if [ -e "$source_file" ]; then
-      install_file "$source_file" "$FISH_CONFIG_DIR/functions/${source_file##*/}"
+      install_symlink "$source_file" "$FISH_CONFIG_DIR/functions/${source_file##*/}"
     fi
   done
 
   logger "INFO" "Installing fish completions to: $FISH_CONFIG_DIR/completions"
   for source_file in "$INSTALL_DIR/completions/"*.fish; do
     if [ -e "$source_file" ]; then
-      install_file "$source_file" "$FISH_CONFIG_DIR/completions/${source_file##*/}"
+      install_symlink "$source_file" "$FISH_CONFIG_DIR/completions/${source_file##*/}"
     fi
   done
 
-  install_file "$INSTALL_DIR/completions/lfg.entrypoints" "$FISH_CONFIG_DIR/completions/lfg.entrypoints"
+  install_symlink "$INSTALL_DIR/completions/lfg.entrypoints" "$FISH_CONFIG_DIR/completions/lfg.entrypoints"
   logger "INFO" "fish configuration complete"
 }
 

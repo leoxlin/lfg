@@ -280,6 +280,7 @@ EOF
 
   assert_file_contains "$output_file" "usage: lfg [entrypoint]" "help/$shell usage"
   assert_file_contains "$output_file" "lfg --update" "help/$shell update"
+  assert_file_contains "$output_file" "lfg --version" "help/$shell version"
   assert_file_contains "$output_file" "lfg --help" "help/$shell help"
 
   if [ -s "$stderr_file" ]; then
@@ -288,6 +289,152 @@ EOF
   fi
 
   echo "ok - help/$shell"
+}
+
+run_lfg_version_case() {
+  local shell="$1"
+  local tmp="$tmp_root/version-$shell"
+  local output_file="$tmp/version.out"
+  local stderr_file="$tmp/version.err"
+  local script="$tmp/version.$shell"
+  local source_dir version_file
+
+  if skip_if_missing_shell "$shell" "version/$shell"; then
+    return 0
+  fi
+
+  mkdir -p "$tmp"
+  version_file="$tmp/VERSION"
+  printf 'test-version\n' > "$version_file"
+
+  case "$shell" in
+    bash)
+      cp "$ROOT/lfg.bash" "$tmp/lfg.bash"
+      cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -o pipefail
+source "$tmp/lfg.bash" || exit 1
+lfg --version > "$output_file" 2> "$stderr_file"
+EOF
+      ;;
+    zsh)
+      cp "$ROOT/lfg.zsh" "$tmp/lfg.zsh"
+      cat > "$script" <<EOF
+#!/usr/bin/env zsh
+emulate -R zsh
+set -o pipefail
+source "$tmp/lfg.zsh" || exit 1
+lfg --version > "$output_file" 2> "$stderr_file"
+EOF
+      ;;
+    fish)
+      mkdir -p "$tmp/install/functions"
+      cp "$ROOT/functions/lfg.fish" "$tmp/install/functions/lfg.fish"
+      cp "$ROOT/functions/worktree.fish" "$tmp/install/functions/worktree.fish"
+      printf 'test-version\n' > "$tmp/install/VERSION"
+      mkdir -p "$tmp/functions"
+      ln -s "$tmp/install/functions/lfg.fish" "$tmp/functions/lfg.fish"
+      ln -s "$tmp/install/functions/worktree.fish" "$tmp/functions/worktree.fish"
+      cat > "$script" <<EOF
+#!/usr/bin/env fish
+source "$tmp/functions/lfg.fish"
+or exit 1
+lfg --version > "$output_file" 2> "$stderr_file"
+EOF
+      ;;
+    *)
+      fail "unknown shell: $shell"
+      ;;
+  esac
+
+  chmod +x "$script"
+
+  if ! run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "version/$shell failed"
+  fi
+
+  assert_eq "$(cat "$output_file")" "lfg test-version" "version/$shell output"
+
+  if [ -s "$stderr_file" ]; then
+    cat "$stderr_file" >&2 || true
+    fail "version/$shell: expected empty stderr"
+  fi
+
+  echo "ok - version/$shell"
+}
+
+run_worktree_version_case() {
+  local shell="$1"
+  local tmp="$tmp_root/worktree-version-$shell"
+  local output_file="$tmp/version.out"
+  local stderr_file="$tmp/version.err"
+  local script="$tmp/version.$shell"
+  local source_dir repo version_file
+
+  if skip_if_missing_shell "$shell" "worktree-version/$shell"; then
+    return 0
+  fi
+
+  mkdir -p "$tmp"
+  version_file="$tmp/VERSION"
+  printf 'test-version\n' > "$version_file"
+
+  case "$shell" in
+    bash)
+      cp "$ROOT/lfg.bash" "$tmp/lfg.bash"
+      cat > "$script" <<EOF
+#!/usr/bin/env bash
+set -o pipefail
+source "$tmp/lfg.bash" || exit 1
+worktree version > "$output_file" 2> "$stderr_file"
+EOF
+      ;;
+    zsh)
+      cp "$ROOT/lfg.zsh" "$tmp/lfg.zsh"
+      cat > "$script" <<EOF
+#!/usr/bin/env zsh
+emulate -R zsh
+set -o pipefail
+source "$tmp/lfg.zsh" || exit 1
+worktree version > "$output_file" 2> "$stderr_file"
+EOF
+      ;;
+    fish)
+      mkdir -p "$tmp/install/functions"
+      cp "$ROOT/functions/lfg.fish" "$tmp/install/functions/lfg.fish"
+      cp "$ROOT/functions/worktree.fish" "$tmp/install/functions/worktree.fish"
+      printf 'test-version\n' > "$tmp/install/VERSION"
+      mkdir -p "$tmp/functions"
+      ln -s "$tmp/install/functions/lfg.fish" "$tmp/functions/lfg.fish"
+      ln -s "$tmp/install/functions/worktree.fish" "$tmp/functions/worktree.fish"
+      cat > "$script" <<EOF
+#!/usr/bin/env fish
+source "$tmp/functions/lfg.fish"
+or exit 1
+worktree version > "$output_file" 2> "$stderr_file"
+EOF
+      ;;
+    *)
+      fail "unknown shell: $shell"
+      ;;
+  esac
+
+  chmod +x "$script"
+
+  if ! run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "worktree-version/$shell failed"
+  fi
+
+  assert_eq "$(cat "$output_file")" "worktree test-version" "worktree-version/$shell output"
+
+  if [ -s "$stderr_file" ]; then
+    cat "$stderr_file" >&2 || true
+    fail "worktree-version/$shell: expected empty stderr"
+  fi
+
+  echo "ok - worktree-version/$shell"
 }
 
 run_fzf_pointer_color_case() {
@@ -755,6 +902,8 @@ for shell in "${shells[@]}"; do
   run_lfg_completion_file_case "$shell"
   run_lfg_completion_missing_file_case "$shell"
   run_lfg_help_case "$shell"
+  run_lfg_version_case "$shell"
+  run_worktree_version_case "$shell"
   run_fzf_pointer_color_case "$shell"
 done
 

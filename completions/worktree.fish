@@ -10,6 +10,7 @@ complete -c worktree -n '__fish_use_subcommand' -a 'ls' -d 'list worktrees'
 complete -c worktree -n '__fish_use_subcommand' -a 'prune' -d 'remove missing, older-than-LFG_PRUNE_OLDER_THAN_DAYS, or without remote branch'
 complete -c worktree -n '__fish_use_subcommand' -a 'remove' -d 'remove a worktree'
 complete -c worktree -n '__fish_use_subcommand' -a 'rm' -d 'remove a worktree'
+complete -c worktree -n '__fish_use_subcommand' -a 'version' -d 'show the installed worktree version'
 complete -c worktree -n '__fish_use_subcommand' -a 'help' -d 'show worktree usage'
 
 complete -c worktree -n '__fish_seen_subcommand_from add cd remove rm' -a '(git for-each-ref --format="%(refname:short)" refs/heads 2>/dev/null)'

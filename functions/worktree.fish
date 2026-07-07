@@ -1,6 +1,23 @@
 # worktree Fish integration for lfg.
 # Release version: 0.4.1 # x-release-please-version
 
+function _worktree_version
+    set -l script_path (status filename)
+    if test -L "$script_path"
+        set script_path (readlink "$script_path")
+    end
+    set -l install_dir (dirname (dirname "$script_path"))
+
+    set -l version_file "$install_dir/VERSION"
+    set -l installed_version unknown
+
+    if test -r "$version_file"
+        set installed_version (cat "$version_file")
+    end
+
+    echo "worktree $installed_version"
+end
+
 function _worktree_usage
     echo "usage: worktree                                 (pick branch/worktree interactively)"
     echo "       worktree add <branch>                    (create or switch to a worktree)"
@@ -8,6 +25,7 @@ function _worktree_usage
     echo "       worktree list|ls                         (list worktrees)"
     echo '       worktree prune                           (remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7}d, or without remote branch)'
     echo "       worktree remove|rm <branch>              (remove a worktree)"
+    echo "       worktree version                         (show the installed worktree version)"
     echo "       worktree help                            (show this help)"
 end
 
@@ -461,6 +479,8 @@ function worktree
             _worktree_remove $argv
         case ""
             _worktree_interactive_cd
+        case version
+            _worktree_version
         case help -h --help
             _worktree_usage
         case '*'

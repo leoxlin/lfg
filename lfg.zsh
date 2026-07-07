@@ -3,6 +3,17 @@
 
 typeset -g __lfg_dir="${${(%):-%x}:A:h}"
 
+function _worktree_version() {
+  local version_file="$__lfg_dir/VERSION"
+  local version="unknown"
+
+  if [ -r "$version_file" ]; then
+    version="$(cat "$version_file")"
+  fi
+
+  echo "worktree $version"
+}
+
 function _worktree_usage() {
   echo "usage: worktree                                 (pick branch/worktree interactively)"
   echo "       worktree add <branch>                    (create or switch to a worktree)"
@@ -10,6 +21,7 @@ function _worktree_usage() {
   echo "       worktree list|ls                         (list worktrees)"
   echo '       worktree prune                           (remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7}d, or without remote branch)'
   echo "       worktree remove|rm <branch>              (remove a worktree)"
+  echo "       worktree version                         (show the installed worktree version)"
   echo "       worktree help                            (show this help)"
 }
 
@@ -429,6 +441,9 @@ function worktree() {
     "")
       _worktree_interactive_cd
       ;;
+    version)
+      _worktree_version
+      ;;
     help|-h|--help)
       _worktree_usage
       ;;
@@ -468,6 +483,7 @@ function _worktree_complete() {
         'prune[remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7}d, or without remote branch]' \
         'remove[remove a worktree]' \
         'rm[remove a worktree]' \
+        'version[show the installed worktree version]' \
         'help[show worktree usage]'
       ;;
     arg1)
@@ -519,9 +535,21 @@ function _lfg_update() {
   return "$update_status"
 }
 
+function _lfg_version() {
+  local version_file="$__lfg_dir/VERSION"
+  local version="unknown"
+
+  if [ -r "$version_file" ]; then
+    version="$(cat "$version_file")"
+  fi
+
+  echo "lfg $version"
+}
+
 function _lfg_usage() {
   echo "usage: lfg [entrypoint]     (navigate to a worktree and start entrypoint, e.g. codex)"
   echo "       lfg --update         (update the lfg plugin to latest)"
+  echo "       lfg --version        (show the installed lfg version)"
   echo "       lfg --help           (show this help)"
 }
 
@@ -557,6 +585,11 @@ function lfg() {
 
   if [ "${1:-}" = "--update" ]; then
     _lfg_update
+    return
+  fi
+
+  if [ "${1:-}" = "--version" ]; then
+    _lfg_version
     return
   fi
 
@@ -601,6 +634,7 @@ function _lfg_complete() {
       entrypoint_completions=("${(@f)$(_lfg_entrypoint_completions)}")
       _values 'entrypoint' \
       '--update[update the lfg plugin to latest]' \
+      '--version[show the installed lfg version]' \
       '--help[show lfg usage]' \
       $entrypoint_completions
       ;;

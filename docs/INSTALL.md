@@ -91,10 +91,11 @@ source /path/to/lfg/lfg.bash
 ```
 
 Keep `completions/lfg.entrypoints` under the same parent as `lfg.zsh` or
-`lfg.bash` for the bundled entrypoint completion suggestions. For fish, copy
+`lfg.bash` for the bundled entrypoint completion suggestions. For fish, symlink
 `functions/` and `completions/` into `~/.config/fish/` and reload;
 `completions/lfg.entrypoints` is installed as the bundled entrypoint completion
-file.
+file. Symlinks let the fish functions locate the install directory, including
+the `VERSION` file.
 
 ## Supported Shells
 
