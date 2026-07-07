@@ -1,5 +1,5 @@
 # Fish completions for worktree.
-# Release version: 0.5.0 # x-release-please-version
+# Release version: 0.5.1 # x-release-please-version
 
 complete -c worktree -f
 

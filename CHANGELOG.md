@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.1](https://github.com/leoxlin/lfg/compare/v0.5.0...v0.5.1) (2026-07-07)
+
+
+### Bug Fixes
+
+* **bash:** symlink resolution, completion word-splitting, robust worktree ([102c82e](https://github.com/leoxlin/lfg/commit/102c82e698b25a6fc7609fdeebf95437e90aa041))
+* **fish:** update install dir, empty env vars, and robust worktree ([f5b69a4](https://github.com/leoxlin/lfg/commit/f5b69a4ba5135cde33fc989e01f99dc9ec5f90ba))
+* **installer:** validate install dir, preserve hooks, check deps ([1358c68](https://github.com/leoxlin/lfg/commit/1358c68cacbd17bfbe0286db0a1f4e01d58f9460))
+* **release:** include entrypoint completions and shellcheck clean ([860d328](https://github.com/leoxlin/lfg/commit/860d328ce96a6ed8fe15cd6b7b869a1ef7c0ee58))
+* **zsh:** completion word-splitting and robust worktree commands ([de579ae](https://github.com/leoxlin/lfg/commit/de579aec66f93b1531ded4929bccb4b6c08405d2))
+
 ## [0.5.0](https://github.com/leoxlin/lfg/compare/v0.4.1...v0.5.0) (2026-07-07)
 
 
