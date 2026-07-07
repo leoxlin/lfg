@@ -2,13 +2,13 @@
 # Release version: 0.5.0 # x-release-please-version
 
 # Load the worktree helpers (also defines the worktree command).
-set -l __lfg_dir (status dirname)
+set -g __lfg_dir (status dirname)
 source "$__lfg_dir/worktree.fish"
 
 function _lfg_in_worktree
-    set -l git_dir (git rev-parse --absolute-git-dir 2>/dev/null)
+    set -l git_dir (git rev-parse --git-dir 2>/dev/null)
     or return 1
-    set -l common_dir (git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+    set -l common_dir (git rev-parse --git-common-dir 2>/dev/null)
     or return 1
 
     test "$git_dir" != "$common_dir"
@@ -22,7 +22,13 @@ function _lfg_update
 
     set -l install_url https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh
 
-    set -l install_dir "$__lfg_dir"
+    # Compute the install directory the same way _lfg_version does, resolving
+    # any symlink so custom install directories are preserved across updates.
+    set -l script_path (status filename)
+    if test -L "$script_path"
+        set script_path (readlink "$script_path")
+    end
+    set -l install_dir (dirname (dirname "$script_path"))
 
     set -l tmpdir /tmp
     if set -q TMPDIR
@@ -92,7 +98,7 @@ function lfg
     set -l entrypoint
     if set -q argv[1]
         set entrypoint $argv[1]
-    else if set -q LFG_DEFAULT_AGENT_COMMAND
+    else if test -n "$LFG_DEFAULT_AGENT_COMMAND"
         set entrypoint $LFG_DEFAULT_AGENT_COMMAND
     else
         set entrypoint claude

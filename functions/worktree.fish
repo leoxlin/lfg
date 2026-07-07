@@ -54,7 +54,7 @@ function _worktree_default_ref
 end
 
 function _worktree_sources_dir
-    if set -q LFG_SOURCE_DIR
+    if test -n "$LFG_SOURCE_DIR"
         echo "$LFG_SOURCE_DIR"
     else
         echo "$HOME/src"
@@ -77,13 +77,24 @@ function _worktree_path_for_branch
     '
 end
 
+function _worktree_sanitize_branch_for_path
+    set -l branch $argv[1]
+
+    # Replace characters that are awkward in directory names with '-' and collapse runs.
+    set branch (string replace -ra '[^A-Za-z0-9._-]+' '-' -- "$branch")
+    set branch (string trim -c '-' -- "$branch")
+
+    echo "$branch"
+end
+
 function _worktree_new_path
     set -l branch $argv[1]
     set -l root (_worktree_parent_path)
     or return 1
     set -l repo (basename "$root")
+    set -l sanitized (_worktree_sanitize_branch_for_path "$branch")
 
-    echo "$(_worktree_base_dir)/$repo-"(string replace -a '/' '-' -- "$branch")"/$repo"
+    echo "$(_worktree_base_dir)/$repo-$sanitized/$repo"
 end
 
 function _worktree_branch_name
@@ -104,10 +115,11 @@ function _worktree_branch_has_remote
         return 1
     end
 
-    set -l output (git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null)
-
-    for remote_branch in $output
-        if test (string replace -r '^[^/]+/' '' -- "$remote_branch") = "$branch"
+    for remote in (git remote 2>/dev/null)
+        if test -z "$remote"
+            continue
+        end
+        if git show-ref --verify --quiet "refs/remotes/$remote/$branch"
             return 0
         end
     end
@@ -171,7 +183,7 @@ function _worktree_fzf
     set -l label $argv[1]
     set -l prompt $argv[2]
     set -l color bright-blue
-    if set -q LFG_FZF_POINTER_COLOR
+    if test -n "$LFG_FZF_POINTER_COLOR"
         set color $LFG_FZF_POINTER_COLOR
     end
 
@@ -321,12 +333,12 @@ function _worktree_add
     or return 1
 
     if git show-ref --verify --quiet "refs/heads/$branch"
-        git worktree add "$worktree_path" "$branch"
+        git worktree add -- "$worktree_path" "$branch"
         or return 1
     else
         set -l default_ref (_worktree_default_ref)
         or return 1
-        git worktree add -b "$branch" "$worktree_path" "$default_ref"
+        git worktree add -b "$branch" -- "$worktree_path" "$default_ref"
         or return 1
     end
 
@@ -358,13 +370,14 @@ function _worktree_remove
         return 1
     end
 
-    git -C "$parent" worktree remove "$worktree_path"
+    git -C "$parent" worktree remove -- "$worktree_path"
     or return 1
     git -C "$parent" worktree prune
+    or return 1
 end
 
 function _worktree_prune_days
-    if set -q LFG_PRUNE_OLDER_THAN_DAYS
+    if test -n "$LFG_PRUNE_OLDER_THAN_DAYS"
         echo $LFG_PRUNE_OLDER_THAN_DAYS
     else
         echo 7
@@ -400,12 +413,13 @@ function _worktree_prune_record
     set -l reason (_worktree_prune_reason "$worktree_path" "$branch_name")
     or return 2
 
-    printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
     if test ! -d "$worktree_path"
-        return 0
+        # git worktree prune at the end will drop the stale record.
+        return 2
     end
 
-    git -C "$parent" worktree remove "$worktree_path"
+    printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
+    git -C "$parent" worktree remove -- "$worktree_path"
 end
 
 function _worktree_prune
