@@ -93,14 +93,19 @@ parse_args() {
 #######################################
 detect_source() {
   local script_path="${BASH_SOURCE[0]:-}"
+  local script_dir
 
   if [ -n "$script_path" ] && [ -f "$script_path" ]; then
-    IS_LOCAL=true
-    REPO_ROOT="$(cd "$(dirname "$script_path")" && pwd)"
-    logger "INFO" "Running from local repository: $REPO_ROOT"
-  else
-    logger "INFO" "Running via remote curl/pipe install"
+    script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+    if [ -f "$script_dir/lfg.zsh" ] || [ -f "$script_dir/lfg.bash" ]; then
+      IS_LOCAL=true
+      REPO_ROOT="$script_dir"
+      logger "INFO" "Running from local repository: $REPO_ROOT"
+      return
+    fi
   fi
+
+  logger "INFO" "Running via remote curl/pipe install"
 }
 
 #######################################

@@ -99,6 +99,17 @@ assert_file_contains() {
   fi
 }
 
+assert_file_not_contains() {
+  local file="$1"
+  local unexpected="$2"
+  local message="$3"
+
+  assert_file_exists "$file" "$message"
+  if grep -Fq -- "$unexpected" "$file"; then
+    fail "$message: expected $file not to contain '$unexpected'"
+  fi
+}
+
 assert_file_contains_before() {
   local file="$1"
   local first="$2"
@@ -508,6 +519,52 @@ run_install_local_version_case() {
   echo "ok - install/local-version"
 }
 
+run_install_remote_from_temp_case() {
+  local tmp="$tmp_root/install-remote-from-temp"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$tmp/lfg"
+  local bin_dir="$tmp/bin"
+  local archive_dir="$tmp/archives"
+  local curl_log="$tmp/curl.log"
+  local output_file="$tmp/install.out"
+  local temp_install_script="$tmp/install.sh"
+  local -a env_args
+  local -a install_args
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$archive_dir"
+  write_fake_release_curl "$bin_dir"
+  write_fake_fzf "$bin_dir"
+
+  cp "$ROOT/install.sh" "$temp_install_script"
+
+  LFG_DIST_DIR="$archive_dir" "$ROOT/scripts/release.sh" latest >/dev/null
+
+  env_args=(
+    "HOME=$home"
+    "ZDOTDIR=$zdotdir"
+    "XDG_CONFIG_HOME=$xdg_config_home"
+    "SHELL=/bin/zsh"
+    "PATH=$bin_dir:$PATH"
+    "LFG_FAKE_CURL_LOG=$curl_log"
+    "LFG_RELEASE_ARCHIVE_DIR=$archive_dir"
+  )
+  install_args=(--install-dir "$install_dir" --install-shell zsh)
+
+  if ! env "${env_args[@]}" bash "$temp_install_script" "${install_args[@]}" > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/remote-from-temp failed"
+  fi
+
+  assert_file_contains "$output_file" "Running via remote curl/pipe install" "install/remote-from-temp detected remote"
+  assert_file_not_contains "$output_file" "Running from local repository" "install/remote-from-temp did not detect local"
+  assert_install_dir_contains_release_tree "$install_dir" "install/remote-from-temp release tree"
+  assert_file_contains "$curl_log" "https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.tar.gz" "install/remote-from-temp downloaded expected release"
+
+  echo "ok - install/remote-from-temp"
+}
+
 run_install_remote_release_case() {
   local case_name="$1"
   local release_version="$2"
@@ -695,6 +752,8 @@ run_install_cases() {
   run_install_source_dir_prompt_case
 
   run_install_local_version_case
+
+  run_install_remote_from_temp_case
 
   run_install_remote_release_case "latest" "" "https://github.com/leoxlin/lfg/releases/download/latest/lfg-latest.tar.gz"
   run_install_remote_release_case "specific" "v2.0.0" "https://github.com/leoxlin/lfg/releases/download/v2.0.0/lfg-2.0.0.tar.gz"
