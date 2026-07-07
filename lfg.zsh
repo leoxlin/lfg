@@ -73,14 +73,27 @@ function _worktree_path_for_branch() {
   '
 }
 
+function _worktree_sanitize_branch_for_path() {
+  local branch="$1"
+
+  # Replace characters that are awkward in directory names with '-' and collapse runs.
+  branch="${branch//[^A-Za-z0-9._-]/-}"
+  while [[ "$branch" == *--* ]]; do
+    branch="${branch//--/-}"
+  done
+
+  echo "$branch"
+}
+
 function _worktree_new_path() {
-  local branch root repo
+  local branch root repo sanitized
 
   branch="$1"
   root="$(_worktree_parent_path)" || return 1
   repo="$(basename "$root")"
+  sanitized="$(_worktree_sanitize_branch_for_path "$branch")"
 
-  echo "$(_worktree_base_dir)/$repo-${branch//\//-}/$repo"
+  echo "$(_worktree_base_dir)/$repo-$sanitized/$repo"
 }
 
 function _worktree_branch_name() {
@@ -98,16 +111,17 @@ function _worktree_branch_name() {
 
 function _worktree_branch_has_remote() {
   local branch="$1"
-  local remote_branch output
+  local remote output
 
   if [ -z "$branch" ] || [ "$branch" = "(detached)" ]; then
     return 1
   fi
 
-  output="$(git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null)"
+  output="$(git remote 2>/dev/null)"
 
-  for remote_branch in ${(f)output}; do
-    if [ "${remote_branch#*/}" = "$branch" ]; then
+  for remote in ${(f)output}; do
+    [ -n "$remote" ] || continue
+    if git show-ref --verify --quiet "refs/remotes/$remote/$branch"; then
       return 0
     fi
   done
@@ -157,10 +171,13 @@ function _worktree_prune_record() {
   branch_name="$(_worktree_branch_name "$branch_ref")"
   reason="$(_worktree_prune_reason "$worktree_path" "$branch_name")" || return 2
 
-  printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
-  [ -d "$worktree_path" ] || return 0
+  if [ ! -d "$worktree_path" ]; then
+    # git worktree prune at the end will drop the stale record.
+    return 2
+  fi
 
-  git -C "$parent" worktree remove "$worktree_path"
+  printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
+  git -C "$parent" worktree remove -- "$worktree_path"
 }
 
 function _worktree_run_setup() {
@@ -333,10 +350,10 @@ function _worktree_add() {
   mkdir -p "$(dirname "$worktree_path")" || return 1
 
   if git show-ref --verify --quiet "refs/heads/$branch"; then
-    git worktree add "$worktree_path" "$branch" || return 1
+    git worktree add -- "$worktree_path" "$branch" || return 1
   else
     default_ref="$(_worktree_default_ref)" || return 1
-    git worktree add -b "$branch" "$worktree_path" "$default_ref" || return 1
+    git worktree add -b "$branch" -- "$worktree_path" "$default_ref" || return 1
   fi
 
   worktree_path="$(_worktree_path_for_branch "$branch")" || return 1
@@ -363,8 +380,8 @@ function _worktree_remove() {
     return 1
   fi
 
-  git -C "$parent" worktree remove "$worktree_path" || return 1
-  git -C "$parent" worktree prune
+  git -C "$parent" worktree remove -- "$worktree_path" || return 1
+  git -C "$parent" worktree prune || return 1
 }
 
 function _worktree_prune() {
@@ -461,7 +478,9 @@ function wt() {
 
 function _worktree_branches() {
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    _values 'branch' $(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
+    local branches
+    branches=(${(f)"$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)"})
+    _values 'branch' "${branches[@]}"
   fi
 }
 
@@ -505,8 +524,8 @@ fi
 function _lfg_in_worktree() {
   local git_dir common_dir
 
-  git_dir="$(git rev-parse --absolute-git-dir 2>/dev/null)" || return 1
-  common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  git_dir="$(git rev-parse --git-dir 2>/dev/null)" || return 1
+  common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
 
   [ "$git_dir" != "$common_dir" ]
 }
