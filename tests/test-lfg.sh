@@ -437,6 +437,50 @@ EOF
   echo "ok - worktree-version/$shell"
 }
 
+run_fzf_empty_env_var_case() {
+  local shell="$1"
+  local tmp source_dir repo bin_dir responses args_log output_file stderr_file script
+
+  if skip_if_missing_shell "$shell" "fzf-empty-env/$shell"; then
+    return 0
+  fi
+
+  tmp="$tmp_root/fzf-empty-env-$shell"
+  source_dir="$tmp/src"
+  repo="$source_dir/repo"
+  bin_dir="$tmp/bin"
+  responses="$tmp/fzf-responses"
+  args_log="$tmp/fzf.args"
+  output_file="$tmp/agent.out"
+  stderr_file="$tmp/lfg.err"
+  script="$tmp/case.$shell"
+
+  mkdir -p "$bin_dir"
+  write_fake_fzf "$bin_dir"
+  setup_repo "$tmp"
+  printf '0|feat/existing\n' > "$responses"
+
+  shell_script_for "$shell" "$script" "$repo"
+
+  # shellcheck disable=SC2030
+  if ! (
+      export LFG_FZF_POINTER_COLOR=""
+      PATH="$bin_dir:$ROOT/tests:$PATH" \
+        LFG_SOURCE_DIR="$source_dir" \
+        LFG_FZF_RESPONSES="$responses" \
+        LFG_FZF_ARGS_LOG="$args_log" \
+        FZF_DEFAULT_OPTS="--cycle" \
+        run_shell_script "$shell" "$script"
+    ); then
+    dump_output "$output_file" "$stderr_file"
+    fail "fzf-empty-env/$shell failed"
+  fi
+
+  assert_file_contains "$args_log" "FZF_DEFAULT_OPTS=--cycle --color=pointer:bright-blue" "fzf-empty-env/$shell pointer color fallback"
+
+  echo "ok - fzf-empty-env/$shell"
+}
+
 run_fzf_pointer_color_case() {
   local shell="$1"
   local case_spec case_name pointer_color expected_color
@@ -466,6 +510,7 @@ run_fzf_pointer_color_case() {
 
     shell_script_for "$shell" "$script" "$repo"
 
+    # shellcheck disable=SC2031
     if ! (
         if [ -n "$pointer_color" ]; then
           export LFG_FZF_POINTER_COLOR="$pointer_color"
@@ -892,6 +937,94 @@ EOF
   echo "ok - lfg/update-bash"
 }
 
+run_lfg_update_fish_case() {
+  local tmp="$tmp_root/lfg-update-fish"
+  local bin_dir="$tmp/bin"
+  local fake_installer="$tmp/install.sh"
+  local curl_log="$tmp/curl.log"
+  local capture="$tmp/update.env"
+  local script="$tmp/update.fish"
+  local output_file="$tmp/update.out"
+  local stderr_file="$tmp/update.err"
+
+  if skip_if_missing_shell fish "lfg/update-fish"; then
+    return 0
+  fi
+
+  mkdir -p "$bin_dir" "$tmp/functions"
+  write_fake_update_curl "$bin_dir"
+
+  cat > "$fake_installer" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${LFG_UPDATE_CAPTURE:?LFG_UPDATE_CAPTURE must be set}"
+
+install_shell=""
+install_dir=""
+install_version=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --install-shell)
+      install_shell="$2"
+      shift 2
+      ;;
+    --install-dir)
+      install_dir="$2"
+      shift 2
+      ;;
+    --install-version)
+      install_version="$2"
+      shift 2
+      ;;
+    *)
+      echo "unexpected installer arg: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+{
+  printf 'install_shell=%s\n' "$install_shell"
+  printf 'install_dir=%s\n' "$install_dir"
+  printf 'install_version=%s\n' "$install_version"
+} > "$LFG_UPDATE_CAPTURE"
+EOF
+
+  # Install fish functions into a fake install dir and symlink them, matching a
+  # real install layout, so _lfg_update computes the install dir correctly.
+  mkdir -p "$tmp/install/functions"
+  cp "$ROOT/functions/lfg.fish" "$tmp/install/functions/lfg.fish"
+  cp "$ROOT/functions/worktree.fish" "$tmp/install/functions/worktree.fish"
+  ln -s "$tmp/install/functions/lfg.fish" "$tmp/functions/lfg.fish"
+  ln -s "$tmp/install/functions/worktree.fish" "$tmp/functions/worktree.fish"
+
+  cat > "$script" <<EOF
+#!/usr/bin/env fish
+source "$tmp/functions/lfg.fish"
+or exit 1
+lfg --update > "$output_file" 2> "$stderr_file"
+EOF
+  chmod +x "$script"
+
+  if ! PATH="$bin_dir:$PATH" \
+      LFG_FAKE_CURL_LOG="$curl_log" \
+      LFG_FAKE_INSTALLER="$fake_installer" \
+      LFG_UPDATE_CAPTURE="$capture" \
+      fish --no-config "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "lfg/update-fish failed"
+  fi
+
+  assert_file_contains "$curl_log" "https://raw.githubusercontent.com/leoxlin/lfg/main/install.sh" "lfg/update-fish downloaded installer"
+  assert_eq "$(field install_shell "$capture")" "fish" "lfg/update-fish install shell"
+  assert_eq "$(field install_dir "$capture")" "$tmp/install" "lfg/update-fish install dir"
+  assert_eq "$(field install_version "$capture")" "" "lfg/update-fish lets installer choose latest release"
+
+  echo "ok - lfg/update-fish"
+}
+
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/lfg-tests.XXXXXX")"
 shells=(bash zsh fish)
 
@@ -905,8 +1038,10 @@ for shell in "${shells[@]}"; do
   run_lfg_version_case "$shell"
   run_worktree_version_case "$shell"
   run_fzf_pointer_color_case "$shell"
+  run_fzf_empty_env_var_case "$shell"
 done
 
 run_lfg_update_bash_case
+run_lfg_update_fish_case
 
 echo "ok - lfg tests complete"

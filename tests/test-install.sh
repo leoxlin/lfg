@@ -167,7 +167,7 @@ write_minimal_path_command_links() {
   local bin_dir="$1"
   local command_name command_path
 
-  for command_name in bash cat chmod dirname rm mkdir cp grep find sort uniq sed; do
+  for command_name in bash cat chmod date dirname rm mkdir cp grep find sort uniq sed git; do
     command_path="$(command -v "$command_name")" || fail "missing command for test setup: $command_name"
     ln -s "$command_path" "$bin_dir/$command_name"
   done
@@ -229,7 +229,7 @@ run_install_auto_detect_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local bin_dir="$tmp/bin"
   local output_file="$tmp/install.out"
   local -a install_args
@@ -297,6 +297,28 @@ run_install_auto_detect_case() {
   echo "ok - install/$case_name"
 }
 
+run_install_rejects_dangerous_dir_case() {
+  local case_name="$1"
+  local install_dir="$2"
+  local expected_message="$3"
+  local tmp="$tmp_root/install-rejects-dangerous-${case_name}"
+  local output_file="$tmp/install.out"
+
+  mkdir -p "$tmp"
+
+  if bash "$ROOT/install.sh" --install-dir "$install_dir" > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/rejects-dangerous-${case_name}: expected $install_dir to fail"
+  fi
+
+  if ! grep -Fq "$expected_message" "$output_file"; then
+    cat "$output_file" >&2 || true
+    fail "install/rejects-dangerous-${case_name}: expected refusal message"
+  fi
+
+  echo "ok - install/rejects-dangerous-${case_name}"
+}
+
 run_install_rejects_args_case() {
   local arg="$1"
   local tmp="$tmp_root/install-rejects-${arg#--}"
@@ -317,6 +339,51 @@ run_install_rejects_args_case() {
   echo "ok - install/rejects-${arg#--}"
 }
 
+run_install_preserves_hook_case() {
+  local method="$1"
+  local install_shell="$2"
+  local tmp="$tmp_root/install-preserves-hook-$method"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$home/lfg"
+  local bin_dir="$tmp/bin"
+  local output_file="$tmp/install.out"
+  local config_file hook_marker
+  local -a install_args
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
+  write_fake_fzf "$bin_dir"
+  install_args=(--install-dir "$install_dir" --install-shell "$install_shell")
+
+  case "$method" in
+    zsh) config_file="$zdotdir/.zshrc" ;;
+    bash) config_file="$home/.bashrc" ;;
+    *) fail "install/preserves-hook-$method: unknown method" ;;
+  esac
+
+  hook_marker="CUSTOM_HOOK_MARKER"
+  mkdir -p "$(dirname "$config_file")"
+  cat > "$config_file" <<EOF
+function lfg_worktree_setup() {
+  printf '%s\n' "$hook_marker" > /dev/null
+}
+EOF
+
+  HOME="$home" \
+    ZDOTDIR="$zdotdir" \
+    XDG_CONFIG_HOME="$xdg_config_home" \
+    PATH="$bin_dir:$PATH" \
+    bash "$ROOT/install.sh" "${install_args[@]}" > "$output_file" 2>&1
+
+  assert_file_contains "$config_file" "$hook_marker" "install/preserves-hook-$method keeps custom hook"
+  assert_file_contains "$config_file" "source \"$install_dir/lfg.$method\"" "install/preserves-hook-$method adds source line"
+  assert_file_contains_before "$config_file" "$hook_marker" "source \"$install_dir/lfg.$method\"" "install/preserves-hook-$method hook before source"
+  assert_file_not_contains "$config_file" "# Optional: customize setup before lfg enters a worktree." "install/preserves-hook-$method does not add no-op stub"
+
+  echo "ok - install/preserves-hook-$method"
+}
+
 run_install_idempotent_case() {
   local method="$1"
   local install_shell="$2"
@@ -324,7 +391,7 @@ run_install_idempotent_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local first_output="$tmp/first.out"
   local second_output="$tmp/second.out"
   local bin_dir="$tmp/bin"
@@ -403,7 +470,7 @@ run_install_replaces_install_dir_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local first_output="$tmp/first.out"
   local second_output="$tmp/second.out"
   local bin_dir="$tmp/bin"
@@ -458,14 +525,14 @@ run_install_source_dir_prompt_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local bin_dir="$tmp/bin"
   local output_file="$tmp/install.out"
-  local source_dir="$home/Source"
+  local source_dir="$home/Code/Projects"
 
   mkdir -p \
-    "$home/.hidden/repo/.git" \
-    "$home/Code/repo/.git" \
+    "$home/.hidden/nested/repo/.git" \
+    "$home/Code/Other/repo/.git" \
     "$source_dir/repo-one/.git" \
     "$source_dir/repo-two/.git" \
     "$bin_dir" \
@@ -496,7 +563,7 @@ run_install_local_version_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local bin_dir="$tmp/bin"
   local output_file="$tmp/install.out"
 
@@ -524,7 +591,7 @@ run_install_remote_from_temp_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local bin_dir="$tmp/bin"
   local archive_dir="$tmp/archives"
   local curl_log="$tmp/curl.log"
@@ -573,7 +640,7 @@ run_install_remote_release_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local bin_dir="$tmp/bin"
   local archive_dir="$tmp/archives"
   local curl_log="$tmp/curl.log"
@@ -626,7 +693,7 @@ run_install_dependencies_brew_fzf_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local stale_file="$install_dir/stale-file"
   local bin_dir="$tmp/bin"
   local brew_log="$tmp/brew.log"
@@ -664,7 +731,7 @@ run_install_dependencies_missing_fzf_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local stale_file="$install_dir/stale-file"
   local bin_dir="$tmp/bin"
   local output_file="$tmp/install.out"
@@ -672,6 +739,7 @@ run_install_dependencies_missing_fzf_case() {
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$install_dir" "$bin_dir"
   printf 'stale\n' > "$stale_file"
+  write_minimal_path_command_links "$bin_dir"
 
   bash_bin="$(command -v bash)" || fail "install/dependencies-missing-fzf: bash not found"
 
@@ -695,7 +763,7 @@ run_install_dependencies_brew_reject_case() {
   local home="$tmp/home"
   local zdotdir="$tmp/zdot"
   local xdg_config_home="$tmp/xdg"
-  local install_dir="$tmp/lfg"
+  local install_dir="$home/lfg"
   local stale_file="$install_dir/stale-file"
   local bin_dir="$tmp/bin"
   local brew_log="$tmp/brew.log"
@@ -705,6 +773,7 @@ run_install_dependencies_brew_reject_case() {
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$install_dir" "$bin_dir"
   printf 'stale\n' > "$stale_file"
   write_fake_brew_installs_fzf "$bin_dir"
+  write_minimal_path_command_links "$bin_dir"
 
   bash_bin="$(command -v bash)" || fail "install/dependencies-brew-reject: bash not found"
 
@@ -748,6 +817,12 @@ run_install_cases() {
 
   run_install_replaces_install_dir_case "zsh" "zsh"
   run_install_replaces_install_dir_case "bash" "bash"
+
+  run_install_preserves_hook_case "zsh" "zsh"
+  run_install_preserves_hook_case "bash" "bash"
+
+  run_install_rejects_dangerous_dir_case "root" "/" "Refusing to install to root directory"
+  run_install_rejects_dangerous_dir_case "home" "$HOME" "Refusing to install directly into \$HOME"
 
   run_install_source_dir_prompt_case
 
