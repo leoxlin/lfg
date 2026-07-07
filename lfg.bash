@@ -1,7 +1,24 @@
 # lfg Bash integration.
 # Release version: 0.5.0 # x-release-please-version
 
-__lfg_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+__lfg_resolve_symlinks() {
+  local path="$1"
+  local dir resolved
+
+  while [ -L "$path" ]; do
+    dir="$(cd "$(dirname "$path")" && pwd)"
+    resolved="$(readlink "$path" 2>/dev/null)" || break
+    case "$resolved" in
+      /*) path="$resolved" ;;
+      *) path="$dir/$resolved" ;;
+    esac
+  done
+
+  echo "$path"
+}
+
+__lfg_dir="$(cd "$(dirname "$(__lfg_resolve_symlinks "${BASH_SOURCE[0]}")")" && pwd)"
+unset -f __lfg_resolve_symlinks
 
 function _worktree_version() {
   local version_file="$__lfg_dir/VERSION"
@@ -19,6 +36,7 @@ function _worktree_usage() {
   echo "       worktree add <branch>                    (create or switch to a worktree)"
   echo "       worktree cd <branch>                     (change to or create a worktree)"
   echo "       worktree list|ls                         (list worktrees)"
+  # shellcheck disable=SC2016
   echo '       worktree prune                           (remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7}d, or without remote branch)'
   echo "       worktree remove|rm <branch>              (remove a worktree)"
   echo "       worktree version                         (show the installed worktree version)"
@@ -73,14 +91,27 @@ function _worktree_path_for_branch() {
   '
 }
 
+function _worktree_sanitize_branch_for_path() {
+  local branch="$1"
+
+  # Replace characters that are awkward in directory names with '-' and collapse runs.
+  branch="${branch//[^A-Za-z0-9._-]/-}"
+  while [[ "$branch" == *--* ]]; do
+    branch="${branch//--/-}"
+  done
+
+  echo "$branch"
+}
+
 function _worktree_new_path() {
-  local branch root repo
+  local branch root repo sanitized
 
   branch="$1"
   root="$(_worktree_parent_path)" || return 1
   repo="$(basename "$root")"
+  sanitized="$(_worktree_sanitize_branch_for_path "$branch")"
 
-  echo "$(_worktree_base_dir)/$repo-${branch//\//-}/$repo"
+  echo "$(_worktree_base_dir)/$repo-$sanitized/$repo"
 }
 
 function _worktree_branch_name() {
@@ -98,17 +129,17 @@ function _worktree_branch_name() {
 
 function _worktree_branch_has_remote() {
   local branch="$1"
-  local remote_branch output
+  local remote output
 
   if [ -z "$branch" ] || [ "$branch" = "(detached)" ]; then
     return 1
   fi
 
-  output="$(git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null)"
+  output="$(git remote 2>/dev/null)"
 
-  while IFS= read -r remote_branch; do
-    [ -n "$remote_branch" ] || continue
-    if [ "${remote_branch#*/}" = "$branch" ]; then
+  while IFS= read -r remote; do
+    [ -n "$remote" ] || continue
+    if git show-ref --verify --quiet "refs/remotes/$remote/$branch"; then
       return 0
     fi
   done <<< "$output"
@@ -117,7 +148,8 @@ function _worktree_branch_has_remote() {
 }
 
 function _worktree_is_older_than_days() {
-  local worktree_path days
+  local worktree_path
+  local days
 
   worktree_path="$1"
   days="$2"
@@ -133,7 +165,9 @@ function _worktree_prune_days() {
 function _worktree_prune_reason() {
   local worktree_path="$1"
   local branch_name="$2"
-  local days="$(_worktree_prune_days)"
+  local days
+
+  days="$(_worktree_prune_days)"
 
   if [ ! -d "$worktree_path" ]; then
     echo "missing directory"
@@ -158,10 +192,13 @@ function _worktree_prune_record() {
   branch_name="$(_worktree_branch_name "$branch_ref")"
   reason="$(_worktree_prune_reason "$worktree_path" "$branch_name")" || return 2
 
-  printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
-  [ -d "$worktree_path" ] || return 0
+  if [ ! -d "$worktree_path" ]; then
+    # git worktree prune at the end will drop the stale record.
+    return 2
+  fi
 
-  git -C "$parent" worktree remove "$worktree_path"
+  printf "Removing %s (%s)\t%s\n" "$branch_name" "$reason" "$worktree_path"
+  git -C "$parent" worktree remove -- "$worktree_path"
 }
 
 function _worktree_run_setup() {
@@ -334,10 +371,10 @@ function _worktree_add() {
   mkdir -p "$(dirname "$worktree_path")" || return 1
 
   if git show-ref --verify --quiet "refs/heads/$branch"; then
-    git worktree add "$worktree_path" "$branch" || return 1
+    git worktree add -- "$worktree_path" "$branch" || return 1
   else
     default_ref="$(_worktree_default_ref)" || return 1
-    git worktree add -b "$branch" "$worktree_path" "$default_ref" || return 1
+    git worktree add -b "$branch" -- "$worktree_path" "$default_ref" || return 1
   fi
 
   worktree_path="$(_worktree_path_for_branch "$branch")" || return 1
@@ -364,8 +401,8 @@ function _worktree_remove() {
     return 1
   fi
 
-  git -C "$parent" worktree remove "$worktree_path" || return 1
-  git -C "$parent" worktree prune
+  git -C "$parent" worktree remove -- "$worktree_path" || return 1
+  git -C "$parent" worktree prune || return 1
 }
 
 function _worktree_prune() {
@@ -463,6 +500,7 @@ function wt() {
 # Bash completions
 function _worktree_completion() {
   local cur prev commands branches
+  local IFS=$'\n'
   COMPREPLY=()
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
@@ -470,11 +508,13 @@ function _worktree_completion() {
   commands="add cd list ls prune remove rm help version"
 
   if [ "$COMP_CWORD" -eq 1 ]; then
+    # shellcheck disable=SC2207
     COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
   else
     case "$prev" in
       add|cd|remove|rm)
         branches="$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)"
+        # shellcheck disable=SC2207
         COMPREPLY=( $(compgen -W "$branches" -- "$cur") )
         ;;
     esac
@@ -488,8 +528,8 @@ complete -F _worktree_completion wt
 function _lfg_in_worktree() {
   local git_dir common_dir
 
-  git_dir="$(git rev-parse --absolute-git-dir 2>/dev/null)" || return 1
-  common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  git_dir="$(git rev-parse --git-dir 2>/dev/null)" || return 1
+  common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
 
   [ "$git_dir" != "$common_dir" ]
 }
@@ -611,12 +651,14 @@ function lfg() {
 
 function _lfg_completion() {
   local cur entrypoint_completions
+  local IFS=$'\n'
   COMPREPLY=()
   cur="${COMP_WORDS[COMP_CWORD]}"
 
   case "$COMP_CWORD" in
     1)
       entrypoint_completions="$(_lfg_entrypoint_completions)"
+      # shellcheck disable=SC2207
       COMPREPLY=( $(compgen -W "--update --version --help $entrypoint_completions" -- "$cur") )
       ;;
   esac
