@@ -9,6 +9,7 @@ FISH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fish"
 
 REPO_ROOT=""
 IS_LOCAL=false
+FORCE=false
 
 #######################################
 # Logging helper
@@ -36,6 +37,8 @@ Options:
                          install.sh, then falls back to zsh.
   --install-version VER  Remote install release version (default: latest). Use
                          values like 0.1.0; tags with a leading v are accepted.
+  --force                Allow installing to directories outside the safe
+                         locations (under \$HOME, /opt, or /usr/local).
   -h, --help             Show this help message
 EOF
 }
@@ -48,6 +51,13 @@ require_option_value() {
     logger "ERROR" "$option requires a value"
     exit 1
   fi
+
+  case "$value" in
+    -*)
+      logger "ERROR" "$option value cannot start with '-': $value"
+      exit 1
+      ;;
+  esac
 }
 
 parse_args() {
@@ -73,6 +83,10 @@ parse_args() {
         INSTALL_VERSION="$2"
         logger "INFO" "Install version set to: $INSTALL_VERSION"
         shift
+        ;;
+      --force)
+        FORCE=true
+        logger "INFO" "Force install enabled"
         ;;
       -h|--help)
         usage
@@ -127,6 +141,11 @@ release_tag_for_version() {
 download_file() {
   local url="$1"
   local dest="$2"
+
+  if ! command -v curl >/dev/null 2>&1; then
+    logger "ERROR" "curl is required for remote installs and updates. Install curl and rerun install.sh."
+    exit 1
+  fi
 
   logger "INFO" "Downloading: $url"
   if ! curl -fsSL "$url" -o "$dest"; then
@@ -187,13 +206,51 @@ copy_release_tree_from_repo() {
 
   logger "INFO" "Copying release files from $source_dir to $dest_dir"
   while IFS= read -r source_file; do
-    relative_file="${source_file#$source_dir/}"
+    relative_file="${source_file#"$source_dir"/}"
     install_file "$source_file" "$dest_dir/$relative_file"
   done < <(find "$source_dir" -type f \( -name 'lfg.*' -o -path "$source_dir/functions/*" -o -path "$source_dir/completions/*" -o -name 'VERSION' \) | sort)
   logger "INFO" "Copied release files to: $dest_dir"
 }
 
+validate_install_dir() {
+  local dir="$1"
+  local normalized
+
+  if [ -z "$dir" ]; then
+    logger "ERROR" "--install-dir cannot be empty"
+    exit 1
+  fi
+
+  if [ "$dir" = "/" ]; then
+    logger "ERROR" "Refusing to install to root directory. Use --force to override."
+    exit 1
+  fi
+
+  normalized="${dir%/}"
+
+  if [ "$normalized" = "$HOME" ]; then
+    logger "ERROR" "Refusing to install directly into \$HOME. Use --force to override."
+    exit 1
+  fi
+
+  if [ "$FORCE" = true ]; then
+    return 0
+  fi
+
+  case "$normalized" in
+    "$HOME"/*|/opt/*|/usr/local/*)
+      return 0
+      ;;
+    *)
+      logger "ERROR" "Install directory must be under \$HOME, /opt, or /usr/local. Use --force to override."
+      exit 1
+      ;;
+  esac
+}
+
 reset_install_dir() {
+  validate_install_dir "$INSTALL_DIR"
+
   logger "INFO" "Resetting install directory: $INSTALL_DIR"
   rm -rf "$INSTALL_DIR"
   mkdir -p "$INSTALL_DIR"
@@ -238,17 +295,23 @@ add_source_block_to_file() {
   mkdir -p "$(dirname "$file")"
   if [ -f "$file" ] && grep -Fxq "$source_line" "$file"; then
     logger "INFO" "Source line already present in: $file"
-  else
-    {
-      echo ""
+    return 0
+  fi
+
+  # shellcheck disable=SC2094
+  {
+    echo ""
+    if [ -f "$file" ] && grep -qE '(^function[[:space:]]+lfg_worktree_setup[[:space:]]*\(|^lfg_worktree_setup[[:space:]]*\()' "$file"; then
+      : # User already defined lfg_worktree_setup; do not override it.
+    else
       echo "function lfg_worktree_setup() {"
       echo "  # Optional: customize setup before lfg enters a worktree."
       echo "  :"
       echo "}"
-      echo "$source_line"
-    } >> "$file"
-    logger "INFO" "Added lfg source block to: $file"
-  fi
+    fi
+    echo "$source_line"
+  } >> "$file"
+  logger "INFO" "Added lfg source block to: $file"
 }
 
 find_home_source_dir() {
@@ -260,7 +323,7 @@ find_home_source_dir() {
 
   logger "INFO" "Searching $HOME for the most common parent directory of git repositories"
   source_dir="$(
-    find "$HOME"/*/*/.git -prune -print 2>/dev/null \
+    find "$HOME"/*/*/*/.git -type d -prune -print 2>/dev/null \
       | while IFS= read -r git_dir; do dirname "$(dirname "$git_dir")"; done \
       | sort \
       | uniq -c \
@@ -302,6 +365,13 @@ prompt_to_install_fzf_with_brew() {
 
 check_dependencies() {
   logger "INFO" "Checking dependencies"
+
+  if ! command -v git >/dev/null 2>&1; then
+    logger "ERROR" "git is required. Install git and rerun install.sh."
+    exit 1
+  fi
+  logger "INFO" "git is available"
+
   if ! command -v fzf >/dev/null 2>&1; then
     logger "WARN" "fzf not found in PATH"
     if command -v brew >/dev/null 2>&1; then
@@ -377,15 +447,17 @@ shell_has_lfg() {
 
   shell_bin="$(command -v "$shell_name" 2>/dev/null)" || return 1
 
+  # Check whether lfg is available as a command without sourcing the user's
+  # interactive rc files. This avoids hangs in headless/CI environments.
   case "$shell_name" in
     bash)
-      "$shell_bin" -i -c 'command -v lfg' >/dev/null 2>&1
+      "$shell_bin" --noprofile --norc -c 'command -v lfg' >/dev/null 2>&1
       ;;
     zsh)
-      "$shell_bin" -i -c 'whence lfg' >/dev/null 2>&1
+      "$shell_bin" -f -c 'whence lfg' >/dev/null 2>&1
       ;;
     fish)
-      "$shell_bin" -i -c 'type lfg' >/dev/null 2>&1
+      "$shell_bin" --no-config -c 'type lfg' >/dev/null 2>&1
       ;;
     *)
       return 1
@@ -407,6 +479,9 @@ install_source_shell() {
   local shell_name="$1"
   local script_name="$2"
   local config_file="$3"
+  local source_line
+
+  source_line="source \"$INSTALL_DIR/$script_name\""
 
   logger "INFO" "Checking lfg source file: $INSTALL_DIR/$script_name"
   if [ ! -f "$INSTALL_DIR/$script_name" ]; then
@@ -415,10 +490,10 @@ install_source_shell() {
   fi
 
   maybe_add_lfg_source_dir_to_file "$config_file"
-  if shell_has_lfg "$shell_name"; then
+  if [ -f "$config_file" ] && grep -Fxq "$source_line" "$config_file"; then
     logger "INFO" "lfg is already installed for $shell_name; skipping ${config_file##*/} update"
   else
-    add_source_block_to_file "source \"$INSTALL_DIR/$script_name\"" "$config_file"
+    add_source_block_to_file "$source_line" "$config_file"
   fi
 }
 
