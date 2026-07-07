@@ -34,6 +34,10 @@
         {
           "type": "generic",
           "path": "completions/worktree.fish"
+        },
+        {
+          "type": "generic",
+          "path": "completions/lfg.entrypoints"
         }
       ],
       "exclude-paths": [

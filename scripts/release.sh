@@ -63,6 +63,7 @@ mkdir -p "$stage_dir"
 release_files=()
 shopt -s nullglob
 for pattern in "${release_patterns[@]}"; do
+  # shellcheck disable=SC2206
   matches=("$ROOT"/$pattern)
   if [ "${#matches[@]}" -eq 0 ]; then
     echo "error: release pattern matched no files: $pattern" >&2
@@ -71,7 +72,7 @@ for pattern in "${release_patterns[@]}"; do
 
   for path in "${matches[@]}"; do
     [ -f "$path" ] || continue
-    release_files+=("${path#$ROOT/}")
+    release_files+=("${path#"$ROOT"/}")
   done
 done
 shopt -u nullglob

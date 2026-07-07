@@ -7,7 +7,7 @@ complete -c worktree -n '__fish_use_subcommand' -a 'add' -d 'create or switch to
 complete -c worktree -n '__fish_use_subcommand' -a 'cd' -d 'change to or create a worktree'
 complete -c worktree -n '__fish_use_subcommand' -a 'list' -d 'list worktrees'
 complete -c worktree -n '__fish_use_subcommand' -a 'ls' -d 'list worktrees'
-complete -c worktree -n '__fish_use_subcommand' -a 'prune' -d 'remove missing, older-than-LFG_PRUNE_OLDER_THAN_DAYS, or without remote branch'
+complete -c worktree -n '__fish_use_subcommand' -a 'prune' -d 'remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7}d, or without remote branch'
 complete -c worktree -n '__fish_use_subcommand' -a 'remove' -d 'remove a worktree'
 complete -c worktree -n '__fish_use_subcommand' -a 'rm' -d 'remove a worktree'
 complete -c worktree -n '__fish_use_subcommand' -a 'version' -d 'show the installed worktree version'
