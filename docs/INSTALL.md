@@ -12,7 +12,7 @@ Runtime dependencies:
 Installer and update dependencies:
 
 - `bash` to run `install.sh`
-- `curl` for the quick install command and `lfg --update`
+- `curl` for remote installs, the quick install command, and `lfg --update`
 - `tar` for remote release installs
 
 ## Quick Install

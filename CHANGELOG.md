@@ -70,7 +70,7 @@
 * add popular coding agents to lfg autocomplete ([fcc23aa](https://github.com/leoxlin/lfg/commit/fcc23aa194e3a71260ac947e211034116269e480))
 * add release script ([6ff4071](https://github.com/leoxlin/lfg/commit/6ff4071508611bb9766617d9a5feafbfa60a451a))
 * change install strategy ([75befe5](https://github.com/leoxlin/lfg/commit/75befe5dbdad4f6d6e77bf95030af69bd7707d38))
-* configurable fzf highlight color via LFG_FZF_HIGHLIGHT_COLOR ([bf0420c](https://github.com/leoxlin/lfg/commit/bf0420c8715a4c3d736c12504a9261502cc9034c))
+* configurable fzf pointer color via LFG_FZF_POINTER_COLOR ([bf0420c](https://github.com/leoxlin/lfg/commit/bf0420c8715a4c3d736c12504a9261502cc9034c))
 * detect running shell for install ([90e1851](https://github.com/leoxlin/lfg/commit/90e185118e3bd0d20114ecc46e898950c4dc29cb))
 * importing lfg.zsh ([eaadfcd](https://github.com/leoxlin/lfg/commit/eaadfcdeb4eeed9535d1d7b320d3360e7881b663))
 * install skill profile source updates ([d210f9c](https://github.com/leoxlin/lfg/commit/d210f9cd060a3adf5a0d705f40a934707824673f))

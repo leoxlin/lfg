@@ -19,7 +19,7 @@ lfg --help           (show this help)
 - Otherwise, `lfg` creates or switches to the selected worktree through `worktree`, then launches the agent there.
 - `lfg --help` prints usage with inline command descriptions, then exits without selecting a repo, entering a worktree, or launching an entrypoint.
 - `lfg --update` downloads the installer and lets it install the latest GitHub release.
-- Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>/<repo>` and reused by branch.
+- Worktrees are created under `$LFG_SOURCE_DIR/.agents/worktrees/<repo>-<branch>/<repo>` (falling back to `$HOME/src` when `LFG_SOURCE_DIR` is unset) and reused by branch. Branch names are sanitized for directory names; `/` and other characters that are awkward in paths are replaced with `-`.
 - If a `lfg_worktree_setup` function exists, `lfg` calls it with the worktree path before entering a worktree.
 
 ## Worktree Helper
@@ -31,7 +31,7 @@ worktree                                 (pick branch/worktree interactively)
 worktree add <branch>                    (create or switch to a worktree)
 worktree cd <branch>                     (change to or create a worktree)
 worktree list|ls                         (list worktrees)
-worktree prune                           (remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7} day(s), or without remote branch)
+worktree prune                           (remove missing, older than ${LFG_PRUNE_OLDER_THAN_DAYS:-7}d, or without remote branch)
 worktree remove|rm <branch>              (remove a worktree)
 worktree version                         (show the installed worktree version)
 worktree help                            (show this help)
@@ -55,14 +55,15 @@ worktree help                            (show this help)
 - older than `${LFG_PRUNE_OLDER_THAN_DAYS:-7}` day(s), or
 - not backed by a remote branch.
 
-After removals, it runs `git worktree prune` from the main checkout.
+Detached-HEAD worktrees are treated as having no remote branch and are also
+pruned. After removals, it runs `git worktree prune` from the main checkout.
 
 ## Completion
 
-Tab completion is available for `--help`, `--update`, and entrypoint completion
-suggestions. Fish and zsh completions include descriptions for the built-in
-options. By default, entrypoint completion suggestions use the bundled
-`completions/lfg.entrypoints` file.
+Tab completion is available for `--help`, `--update`, `--version`, and
+entrypoint completion suggestions. Fish and zsh completions include
+descriptions for the built-in options. By default, entrypoint completion
+suggestions use the bundled `completions/lfg.entrypoints` file.
 
 Options:
 
