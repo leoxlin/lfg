@@ -92,7 +92,11 @@ if [ -n "${LFG_FZF_ARGS_LOG:-}" ]; then
   printf '%s\n' "$*" >> "$LFG_FZF_ARGS_LOG"
 fi
 
-cat >/dev/null
+if [ -n "${LFG_FZF_STDIN_LOG:-}" ]; then
+  cat >> "$LFG_FZF_STDIN_LOG"
+else
+  cat >/dev/null
+fi
 
 if [ ! -s "$LFG_FZF_RESPONSES" ]; then
   echo "fake fzf: no queued response" >&2
@@ -170,10 +174,27 @@ setup_repo() {
   git -C "$repo" worktree add -b feat/start "$start_worktree" main >/dev/null 2>&1 || fail "creates starting worktree"
 }
 
+write_fake_agents() {
+  local bin_dir="$1"
+  shift
+  local agent
+
+  for agent in "$@"; do
+    cat > "$bin_dir/$agent" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'agent=%s\n' "$(basename "$0")"
+printf 'pwd=%s\n' "$(pwd -P)"
+EOF
+    chmod +x "$bin_dir/$agent"
+  done
+}
+
 shell_script_for() {
   local shell="$1"
   local script="$2"
   local start_dir="$3"
+  local lfg_command="${4:-lfg fake-agent}"
   local output_file="${script%/*}/agent.out"
   local stderr_file="${script%/*}/lfg.err"
 
@@ -184,7 +205,7 @@ shell_script_for() {
 set -o pipefail
 source "$ROOT/lfg.bash" || exit 1
 cd "$start_dir" || exit 1
-lfg fake-agent > "$output_file" 2> "$stderr_file"
+$lfg_command > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     zsh)
@@ -194,7 +215,7 @@ emulate -R zsh
 set -o pipefail
 source "$ROOT/lfg.zsh" || exit 1
 cd "$start_dir" || exit 1
-lfg fake-agent > "$output_file" 2> "$stderr_file"
+$lfg_command > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     fish)
@@ -204,7 +225,7 @@ source "$ROOT/functions/lfg.fish"
 or exit 1
 cd "$start_dir"
 or exit 1
-lfg fake-agent > "$output_file" 2> "$stderr_file"
+$lfg_command > "$output_file" 2> "$stderr_file"
 EOF
       ;;
     *)
@@ -861,6 +882,134 @@ EOF
   echo "ok - completion-missing-file/$shell"
 }
 
+run_lfg_smart_mode_case() {
+  local shell="$1"
+  local tmp="$tmp_root/smart-mode-$shell"
+  local source_dir="$tmp/src"
+  local bin_dir="$tmp/bin"
+  local responses="$tmp/fzf-responses"
+  local args_log="$tmp/fzf.args"
+  local stdin_log="$tmp/fzf.stdin"
+  local output_file="$tmp/agent.out"
+  local stderr_file="$tmp/lfg.err"
+  local script="$tmp/case.$shell"
+  local start_dir
+
+  if skip_if_missing_shell "$shell" "smart-mode/$shell"; then
+    return 0
+  fi
+
+  mkdir -p "$bin_dir"
+  write_fake_fzf "$bin_dir"
+  write_fake_agents "$bin_dir" kimi codex
+  setup_repo "$tmp"
+  start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
+
+  printf '0|kimi\n' > "$responses"
+
+  shell_script_for "$shell" "$script" "$start_dir" "lfg"
+
+  if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
+      LFG_SOURCE_DIR="$source_dir" \
+      LFG_SMART_MODE=1 \
+      LFG_FZF_RESPONSES="$responses" \
+      LFG_FZF_ARGS_LOG="$args_log" \
+      LFG_FZF_STDIN_LOG="$stdin_log" \
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "smart-mode/$shell failed"
+  fi
+
+  assert_eq "$(field agent "$output_file")" "kimi" "smart-mode/$shell launched picked entrypoint"
+  assert_eq "$(field pwd "$output_file")" "$start_dir" "smart-mode/$shell launched in current worktree"
+  assert_file_contains "$stdin_log" "kimi" "smart-mode/$shell offered kimi"
+  assert_file_contains "$stdin_log" "codex" "smart-mode/$shell offered codex"
+  assert_file_contains "$args_log" "--border-label= Select an agent " "smart-mode/$shell border label"
+  assert_file_contains "$args_log" "--prompt=agent> " "smart-mode/$shell prompt"
+
+  echo "ok - smart-mode/$shell"
+}
+
+run_lfg_smart_mode_no_entrypoints_case() {
+  local shell="$1"
+  local tmp="$tmp_root/smart-mode-empty-$shell"
+  local source_dir="$tmp/src"
+  local bin_dir="$tmp/bin"
+  local completions_file="$tmp/entrypoints"
+  local responses="$tmp/fzf-responses"
+  local output_file="$tmp/agent.out"
+  local stderr_file="$tmp/lfg.err"
+  local script="$tmp/case.$shell"
+  local start_dir
+
+  if skip_if_missing_shell "$shell" "smart-mode-empty/$shell"; then
+    return 0
+  fi
+
+  mkdir -p "$bin_dir"
+  write_fake_fzf "$bin_dir"
+  setup_repo "$tmp"
+  start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
+
+  printf 'lfg-test-missing-agent\n' > "$completions_file"
+  : > "$responses"
+
+  shell_script_for "$shell" "$script" "$start_dir" "lfg"
+
+  if PATH="$bin_dir:$ROOT/tests:$PATH" \
+      LFG_SOURCE_DIR="$source_dir" \
+      LFG_SMART_MODE=1 \
+      LFG_COMPLETIONS_FILE="$completions_file" \
+      LFG_FZF_RESPONSES="$responses" \
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "smart-mode-empty/$shell unexpectedly succeeded"
+  fi
+
+  assert_file_contains "$stderr_file" "lfg: no available agent entrypoints found on PATH" "smart-mode-empty/$shell stderr"
+
+  echo "ok - smart-mode-empty/$shell"
+}
+
+run_lfg_smart_mode_explicit_entrypoint_case() {
+  local shell="$1"
+  local tmp="$tmp_root/smart-mode-explicit-$shell"
+  local source_dir="$tmp/src"
+  local bin_dir="$tmp/bin"
+  local responses="$tmp/fzf-responses"
+  local output_file="$tmp/agent.out"
+  local stderr_file="$tmp/lfg.err"
+  local script="$tmp/case.$shell"
+  local start_dir
+
+  if skip_if_missing_shell "$shell" "smart-mode-explicit/$shell"; then
+    return 0
+  fi
+
+  mkdir -p "$bin_dir"
+  write_fake_fzf "$bin_dir"
+  setup_repo "$tmp"
+  start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
+
+  # Empty queue: if the picker ran, fake fzf would exit 130 and fail the run.
+  : > "$responses"
+
+  shell_script_for "$shell" "$script" "$start_dir" "lfg fake-agent"
+
+  if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
+      LFG_SOURCE_DIR="$source_dir" \
+      LFG_SMART_MODE=1 \
+      LFG_FZF_RESPONSES="$responses" \
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "smart-mode-explicit/$shell failed"
+  fi
+
+  assert_eq "$(field pwd "$output_file")" "$start_dir" "smart-mode-explicit/$shell launched explicit entrypoint"
+
+  echo "ok - smart-mode-explicit/$shell"
+}
+
 run_lfg_update_bash_case() {
   local tmp="$tmp_root/lfg-update-bash"
   local bin_dir="$tmp/bin"
@@ -1034,6 +1183,9 @@ for shell in "${shells[@]}"; do
   run_worktree_setup_hook_case "$shell"
   run_lfg_completion_file_case "$shell"
   run_lfg_completion_missing_file_case "$shell"
+  run_lfg_smart_mode_case "$shell"
+  run_lfg_smart_mode_no_entrypoints_case "$shell"
+  run_lfg_smart_mode_explicit_entrypoint_case "$shell"
   run_lfg_help_case "$shell"
   run_lfg_version_case "$shell"
   run_worktree_version_case "$shell"

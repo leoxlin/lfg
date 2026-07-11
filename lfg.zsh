@@ -594,6 +594,43 @@ function _lfg_entrypoint_completions() {
   _lfg_file_entrypoint_completions
 }
 
+function _lfg_smart_mode() {
+  [ -n "${LFG_SMART_MODE:-}" ]
+}
+
+function _lfg_available_entrypoints() {
+  local entrypoint
+
+  _lfg_entrypoint_completions | while IFS= read -r entrypoint; do
+    if command -v "$entrypoint" >/dev/null 2>&1; then
+      printf '%s\n' "$entrypoint"
+    fi
+  done
+}
+
+function _lfg_pick_entrypoint() {
+  local entrypoints out code entrypoint
+
+  entrypoints="$(_lfg_available_entrypoints)"
+  if [ -z "$entrypoints" ]; then
+    echo "lfg: no available agent entrypoints found on PATH" >&2
+    return 1
+  fi
+
+  if ! command -v fzf >/dev/null 2>&1; then
+    echo "lfg: fzf is required to pick an entrypoint" >&2
+    return 1
+  fi
+
+  out="$(printf '%s\n' "$entrypoints" | _worktree_fzf ' Select an agent ' 'agent> ')"
+  code=$?
+  [ "$code" -eq 0 ] || return 1
+
+  entrypoint="$(printf '%s\n' "$out" | tail -n1)"
+  [ -n "$entrypoint" ] || return 1
+  echo "$entrypoint"
+}
+
 function lfg() {
   local entrypoint branch repo
 
@@ -617,7 +654,11 @@ function lfg() {
     return
   fi
 
-  entrypoint="${1:-${LFG_DEFAULT_AGENT_COMMAND:-claude}}"
+  if [ "$#" -eq 0 ] && _lfg_smart_mode; then
+    entrypoint="$(_lfg_pick_entrypoint)" || return 1
+  else
+    entrypoint="${1:-${LFG_DEFAULT_AGENT_COMMAND:-claude}}"
+  fi
   branch=""
 
   if ! command -v "$entrypoint" >/dev/null 2>&1; then
