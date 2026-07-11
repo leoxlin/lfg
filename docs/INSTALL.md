@@ -6,6 +6,7 @@ Runtime dependencies:
 
 - `git`
 - `fzf`
+- `gum`
 - zsh, bash, or fish
 - the agent command you want `lfg` to launch, such as `claude` or `codex`
 

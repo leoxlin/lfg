@@ -15,7 +15,7 @@ lfg --help           (show this help)
 - Outside a git repo, `$LFG_SOURCE_DIR` should point to the folder that contains your cloned git repositories; it must exist and contain at least one immediate child repo with `.git`.
 - When not already inside a linked worktree, `lfg` asks you to pick an existing worktree branch or type a new branch name to create one; the selector uses a rounded border labeled `Select or create worktree branch` around the `worktree> ` prompt.
 - `lfg` appends `--color=pointer:<pointer-color>` to `FZF_DEFAULT_OPTS` for its `fzf` selectors so the selection pointer is colored by `LFG_FZF_POINTER_COLOR`.
-- When `LFG_SMART_MODE` is set and `lfg` runs without an entrypoint argument, `lfg` discovers the available agent entrypoints from the entrypoint completion suggestions (keeping only commands found on `PATH`) and asks you to pick one with `fzf`; the selector uses a rounded border labeled `Select an agent` around the `agent> ` prompt. Passing an entrypoint explicitly (`lfg codex`) skips the picker. If no completion entrypoints are available on `PATH`, `lfg` prints an error instead of launching anything.
+- When `LFG_SMART_MODE` is set and `lfg` runs without an entrypoint argument, `lfg` discovers the available agent entrypoints from the entrypoint completion suggestions (keeping only commands found on `PATH`) and asks you to pick one from a `gum choose` menu headed `Select an agent`. Passing an entrypoint explicitly (`lfg codex`) skips the picker. If no completion entrypoints are available on `PATH`, `lfg` prints an error instead of launching anything. Smart mode requires `gum`.
 - If already inside a linked worktree, `lfg` launches the agent in the current directory.
 - Otherwise, `lfg` creates or switches to the selected worktree through `worktree`, then launches the agent there.
 - `lfg --help` prints usage with inline command descriptions, then exits without selecting a repo, entering a worktree, or launching an entrypoint.
@@ -101,7 +101,7 @@ Configure `lfg` with environment variables.
 | `LFG_FZF_POINTER_COLOR` | `bright-blue` | Color for the fzf selection pointer. Passed as `pointer:<color>`. |
 | `LFG_SOURCE_DIR` | `~/src` | Root directory scanned for repos when `lfg` is run outside a git repo. |
 | `LFG_COMPLETIONS_FILE` | bundled `completions/lfg.entrypoints` | Newline-delimited file of `lfg` entrypoint completion suggestions. Blank lines and lines starting with `#` are ignored. |
-| `LFG_SMART_MODE` | unset | When set, `lfg` without an entrypoint argument picks one interactively from the available agent entrypoints instead of using `LFG_DEFAULT_AGENT_COMMAND`. |
+| `LFG_SMART_MODE` | unset | When set, `lfg` without an entrypoint argument picks one from a `gum` menu of available agent entrypoints instead of using `LFG_DEFAULT_AGENT_COMMAND`. |
 
 Set a different default agent:
 

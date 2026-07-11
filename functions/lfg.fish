@@ -124,18 +124,14 @@ function _lfg_pick_entrypoint
         return 1
     end
 
-    if not command -v fzf >/dev/null 2>&1
-        echo "lfg: fzf is required to pick an entrypoint" >&2
+    if not command -v gum >/dev/null 2>&1
+        echo "lfg: gum is required to pick an entrypoint" >&2
+        echo "Install gum: https://github.com/charmbracelet/gum" >&2
         return 1
     end
 
-    set -l out (printf '%s\n' $entrypoints | _worktree_fzf ' Select an agent ' 'agent> ')
-    set -l code $status
-    if test $code -ne 0
-        return 1
-    end
-
-    set -l entrypoint (printf '%s\n' $out | tail -n1)
+    set -l entrypoint (printf '%s\n' $entrypoints | gum choose --header ' Select an agent ')
+    or return 1
     if test -z "$entrypoint"
         return 1
     end

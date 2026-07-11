@@ -119,6 +119,46 @@ EOF
   chmod +x "$bin_dir/fzf"
 }
 
+write_fake_gum() {
+  local bin_dir="$1"
+
+  cat > "$bin_dir/gum" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${LFG_GUM_RESPONSES:?LFG_GUM_RESPONSES must point to queued fake gum responses}"
+
+if [ -n "${LFG_GUM_ARGS_LOG:-}" ]; then
+  printf '%s\n' "$*" >> "$LFG_GUM_ARGS_LOG"
+fi
+
+if [ -n "${LFG_GUM_STDIN_LOG:-}" ]; then
+  cat >> "$LFG_GUM_STDIN_LOG"
+else
+  cat >/dev/null
+fi
+
+if [ ! -s "$LFG_GUM_RESPONSES" ]; then
+  echo "fake gum: no queued response" >&2
+  exit 130
+fi
+
+line="$(sed -n '1p' "$LFG_GUM_RESPONSES")"
+tail -n +2 "$LFG_GUM_RESPONSES" > "$LFG_GUM_RESPONSES.next"
+mv "$LFG_GUM_RESPONSES.next" "$LFG_GUM_RESPONSES"
+
+code="${line%%|*}"
+output="${line#*|}"
+
+if [ "$output" != "__EMPTY__" ]; then
+  printf '%s\n' "$output"
+fi
+
+exit "$code"
+EOF
+  chmod +x "$bin_dir/gum"
+}
+
 write_fake_update_curl() {
   local bin_dir="$1"
 
@@ -900,7 +940,7 @@ run_lfg_smart_mode_case() {
   fi
 
   mkdir -p "$bin_dir"
-  write_fake_fzf "$bin_dir"
+  write_fake_gum "$bin_dir"
   write_fake_agents "$bin_dir" kimi codex
   setup_repo "$tmp"
   start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
@@ -912,9 +952,9 @@ run_lfg_smart_mode_case() {
   if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
       LFG_SOURCE_DIR="$source_dir" \
       LFG_SMART_MODE=1 \
-      LFG_FZF_RESPONSES="$responses" \
-      LFG_FZF_ARGS_LOG="$args_log" \
-      LFG_FZF_STDIN_LOG="$stdin_log" \
+      LFG_GUM_RESPONSES="$responses" \
+      LFG_GUM_ARGS_LOG="$args_log" \
+      LFG_GUM_STDIN_LOG="$stdin_log" \
       run_shell_script "$shell" "$script"; then
     dump_output "$output_file" "$stderr_file"
     fail "smart-mode/$shell failed"
@@ -924,8 +964,8 @@ run_lfg_smart_mode_case() {
   assert_eq "$(field pwd "$output_file")" "$start_dir" "smart-mode/$shell launched in current worktree"
   assert_file_contains "$stdin_log" "kimi" "smart-mode/$shell offered kimi"
   assert_file_contains "$stdin_log" "codex" "smart-mode/$shell offered codex"
-  assert_file_contains "$args_log" "--border-label= Select an agent " "smart-mode/$shell border label"
-  assert_file_contains "$args_log" "--prompt=agent> " "smart-mode/$shell prompt"
+  assert_file_contains "$args_log" "choose" "smart-mode/$shell gum choose subcommand"
+  assert_file_contains "$args_log" "Select an agent" "smart-mode/$shell gum header"
 
   echo "ok - smart-mode/$shell"
 }
@@ -947,7 +987,7 @@ run_lfg_smart_mode_no_entrypoints_case() {
   fi
 
   mkdir -p "$bin_dir"
-  write_fake_fzf "$bin_dir"
+  write_fake_gum "$bin_dir"
   setup_repo "$tmp"
   start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
 
@@ -960,7 +1000,7 @@ run_lfg_smart_mode_no_entrypoints_case() {
       LFG_SOURCE_DIR="$source_dir" \
       LFG_SMART_MODE=1 \
       LFG_COMPLETIONS_FILE="$completions_file" \
-      LFG_FZF_RESPONSES="$responses" \
+      LFG_GUM_RESPONSES="$responses" \
       run_shell_script "$shell" "$script"; then
     dump_output "$output_file" "$stderr_file"
     fail "smart-mode-empty/$shell unexpectedly succeeded"
@@ -987,11 +1027,11 @@ run_lfg_smart_mode_explicit_entrypoint_case() {
   fi
 
   mkdir -p "$bin_dir"
-  write_fake_fzf "$bin_dir"
+  write_fake_gum "$bin_dir"
   setup_repo "$tmp"
   start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
 
-  # Empty queue: if the picker ran, fake fzf would exit 130 and fail the run.
+  # Empty queue: if the picker ran, fake gum would exit 130 and fail the run.
   : > "$responses"
 
   shell_script_for "$shell" "$script" "$start_dir" "lfg fake-agent"
@@ -999,7 +1039,7 @@ run_lfg_smart_mode_explicit_entrypoint_case() {
   if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
       LFG_SOURCE_DIR="$source_dir" \
       LFG_SMART_MODE=1 \
-      LFG_FZF_RESPONSES="$responses" \
+      LFG_GUM_RESPONSES="$responses" \
       run_shell_script "$shell" "$script"; then
     dump_output "$output_file" "$stderr_file"
     fail "smart-mode-explicit/$shell failed"

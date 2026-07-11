@@ -613,7 +613,7 @@ function _lfg_available_entrypoints() {
 }
 
 function _lfg_pick_entrypoint() {
-  local entrypoints out code entrypoint
+  local entrypoints entrypoint
 
   entrypoints="$(_lfg_available_entrypoints)"
   if [ -z "$entrypoints" ]; then
@@ -621,16 +621,13 @@ function _lfg_pick_entrypoint() {
     return 1
   fi
 
-  if ! command -v fzf >/dev/null 2>&1; then
-    echo "lfg: fzf is required to pick an entrypoint" >&2
+  if ! command -v gum >/dev/null 2>&1; then
+    echo "lfg: gum is required to pick an entrypoint" >&2
+    echo "Install gum: https://github.com/charmbracelet/gum" >&2
     return 1
   fi
 
-  out="$(printf '%s\n' "$entrypoints" | _worktree_fzf ' Select an agent ' 'agent> ')"
-  code=$?
-  [ "$code" -eq 0 ] || return 1
-
-  entrypoint="$(printf '%s\n' "$out" | tail -n1)"
+  entrypoint="$(printf '%s\n' "$entrypoints" | gum choose --header ' Select an agent ')" || return 1
   [ -n "$entrypoint" ] || return 1
   echo "$entrypoint"
 }
