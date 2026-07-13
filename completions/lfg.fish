@@ -1,5 +1,5 @@
 # Fish completions for lfg.
-# Release version: 0.5.1 # x-release-please-version
+# Release version: 0.6.0 # x-release-please-version
 
 set -g __lfg_completion_dir (status dirname)
 

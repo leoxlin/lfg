@@ -1,5 +1,5 @@
 # lfg Zsh integration.
-# Release version: 0.5.1 # x-release-please-version
+# Release version: 0.6.0 # x-release-please-version
 
 typeset -g __lfg_dir="${${(%):-%x}:A:h}"
 

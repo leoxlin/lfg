@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.0](https://github.com/leoxlin/lfg/compare/v0.5.1...v0.6.0) (2026-07-13)
+
+
+### Features
+
+* add smart mode ([9896c48](https://github.com/leoxlin/lfg/commit/9896c48ec9d517ab36b73415dcfe49682c7be213))
+* prefer kimi over kimi-code ([8907ef3](https://github.com/leoxlin/lfg/commit/8907ef3763602fb516265102af80ef2cfcb78987))
+* rank last used ([a87b1e9](https://github.com/leoxlin/lfg/commit/a87b1e95361eaa3c29a405d55adf203b0a7415ca))
+* use gum for entrypoint select ([8098b5f](https://github.com/leoxlin/lfg/commit/8098b5fa81af1cac15995281b1a53e033c35512f))
+
 ## [0.5.1](https://github.com/leoxlin/lfg/compare/v0.5.0...v0.5.1) (2026-07-07)
 
 

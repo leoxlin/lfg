@@ -1,5 +1,5 @@
 # worktree Fish integration for lfg.
-# Release version: 0.5.1 # x-release-please-version
+# Release version: 0.6.0 # x-release-please-version
 
 function _worktree_version
     set -l script_path (status filename)
