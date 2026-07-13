@@ -1,5 +1,5 @@
 # lfg Bash integration.
-# Release version: 0.5.1 # x-release-please-version
+# Release version: 0.6.0 # x-release-please-version
 
 __lfg_resolve_symlinks() {
   local path="$1"
