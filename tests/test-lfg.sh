@@ -119,46 +119,6 @@ EOF
   chmod +x "$bin_dir/fzf"
 }
 
-write_fake_gum() {
-  local bin_dir="$1"
-
-  cat > "$bin_dir/gum" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-: "${LFG_GUM_RESPONSES:?LFG_GUM_RESPONSES must point to queued fake gum responses}"
-
-if [ -n "${LFG_GUM_ARGS_LOG:-}" ]; then
-  printf '%s\n' "$*" >> "$LFG_GUM_ARGS_LOG"
-fi
-
-if [ -n "${LFG_GUM_STDIN_LOG:-}" ]; then
-  cat >> "$LFG_GUM_STDIN_LOG"
-else
-  cat >/dev/null
-fi
-
-if [ ! -s "$LFG_GUM_RESPONSES" ]; then
-  echo "fake gum: no queued response" >&2
-  exit 130
-fi
-
-line="$(sed -n '1p' "$LFG_GUM_RESPONSES")"
-tail -n +2 "$LFG_GUM_RESPONSES" > "$LFG_GUM_RESPONSES.next"
-mv "$LFG_GUM_RESPONSES.next" "$LFG_GUM_RESPONSES"
-
-code="${line%%|*}"
-output="${line#*|}"
-
-if [ "$output" != "__EMPTY__" ]; then
-  printf '%s\n' "$output"
-fi
-
-exit "$code"
-EOF
-  chmod +x "$bin_dir/gum"
-}
-
 write_fake_update_curl() {
   local bin_dir="$1"
 
@@ -940,7 +900,7 @@ run_lfg_smart_mode_case() {
   fi
 
   mkdir -p "$bin_dir"
-  write_fake_gum "$bin_dir"
+  write_fake_fzf "$bin_dir"
   write_fake_agents "$bin_dir" kimi codex
   setup_repo "$tmp"
   start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
@@ -952,9 +912,9 @@ run_lfg_smart_mode_case() {
   if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
       LFG_SOURCE_DIR="$source_dir" \
       LFG_SMART_MODE=1 \
-      LFG_GUM_RESPONSES="$responses" \
-      LFG_GUM_ARGS_LOG="$args_log" \
-      LFG_GUM_STDIN_LOG="$stdin_log" \
+      LFG_FZF_RESPONSES="$responses" \
+      LFG_FZF_ARGS_LOG="$args_log" \
+      LFG_FZF_STDIN_LOG="$stdin_log" \
       run_shell_script "$shell" "$script"; then
     dump_output "$output_file" "$stderr_file"
     fail "smart-mode/$shell failed"
@@ -964,8 +924,8 @@ run_lfg_smart_mode_case() {
   assert_eq "$(field pwd "$output_file")" "$start_dir" "smart-mode/$shell launched in current worktree"
   assert_file_contains "$stdin_log" "kimi" "smart-mode/$shell offered kimi"
   assert_file_contains "$stdin_log" "codex" "smart-mode/$shell offered codex"
-  assert_file_contains "$args_log" "choose" "smart-mode/$shell gum choose subcommand"
-  assert_file_contains "$args_log" "Select an agent" "smart-mode/$shell gum header"
+  assert_file_contains "$args_log" "--border-label= Select an agent " "smart-mode/$shell border label"
+  assert_file_contains "$args_log" "--prompt=agent> " "smart-mode/$shell prompt"
 
   echo "ok - smart-mode/$shell"
 }
@@ -987,7 +947,7 @@ run_lfg_smart_mode_no_entrypoints_case() {
   fi
 
   mkdir -p "$bin_dir"
-  write_fake_gum "$bin_dir"
+  write_fake_fzf "$bin_dir"
   setup_repo "$tmp"
   start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
 
@@ -1000,7 +960,7 @@ run_lfg_smart_mode_no_entrypoints_case() {
       LFG_SOURCE_DIR="$source_dir" \
       LFG_SMART_MODE=1 \
       LFG_COMPLETIONS_FILE="$completions_file" \
-      LFG_GUM_RESPONSES="$responses" \
+      LFG_FZF_RESPONSES="$responses" \
       run_shell_script "$shell" "$script"; then
     dump_output "$output_file" "$stderr_file"
     fail "smart-mode-empty/$shell unexpectedly succeeded"
@@ -1027,11 +987,11 @@ run_lfg_smart_mode_explicit_entrypoint_case() {
   fi
 
   mkdir -p "$bin_dir"
-  write_fake_gum "$bin_dir"
+  write_fake_fzf "$bin_dir"
   setup_repo "$tmp"
   start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
 
-  # Empty queue: if the picker ran, fake gum would exit 130 and fail the run.
+  # Empty queue: if the picker ran, fake fzf would exit 130 and fail the run.
   : > "$responses"
 
   shell_script_for "$shell" "$script" "$start_dir" "lfg fake-agent"
@@ -1039,7 +999,7 @@ run_lfg_smart_mode_explicit_entrypoint_case() {
   if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
       LFG_SOURCE_DIR="$source_dir" \
       LFG_SMART_MODE=1 \
-      LFG_GUM_RESPONSES="$responses" \
+      LFG_FZF_RESPONSES="$responses" \
       run_shell_script "$shell" "$script"; then
     dump_output "$output_file" "$stderr_file"
     fail "smart-mode-explicit/$shell failed"
@@ -1048,6 +1008,127 @@ run_lfg_smart_mode_explicit_entrypoint_case() {
   assert_eq "$(field pwd "$output_file")" "$start_dir" "smart-mode-explicit/$shell launched explicit entrypoint"
 
   echo "ok - smart-mode-explicit/$shell"
+}
+
+run_recency_ranking_case() {
+  local shell="$1"
+  local tmp="$tmp_root/recency-$shell"
+  local source_dir="$tmp/src"
+  local repo2="$source_dir/repo2"
+  local bin_dir="$tmp/bin"
+  local responses="$tmp/fzf-responses"
+  local stdin_log="$tmp/fzf.stdin"
+  local output_file="$tmp/agent.out"
+  local stderr_file="$tmp/lfg.err"
+  local script="$tmp/case.$shell"
+  local start_dir="$tmp/outside"
+
+  if skip_if_missing_shell "$shell" "recency/$shell"; then
+    return 0
+  fi
+
+  mkdir -p "$bin_dir" "$start_dir"
+  write_fake_fzf "$bin_dir"
+  setup_repo "$tmp"
+
+  mkdir -p "$repo2" || fail "recency/$shell: creates second repo directory"
+  git init -b main "$repo2" >/dev/null || fail "recency/$shell: initializes second repo"
+  git -C "$repo2" config user.email "tests@example.invalid"
+  git -C "$repo2" config user.name "lfg tests"
+  printf "second\n" > "$repo2/README.md"
+  git -C "$repo2" add README.md
+  git -C "$repo2" commit -m "initial" >/dev/null || fail "recency/$shell: creates second repo commit"
+
+  shell_script_for "$shell" "$script" "$start_dir"
+
+  # Run 1: pick repo + branch feat/existing.
+  printf '0|repo\n0|feat/existing\n' > "$responses"
+  if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
+      LFG_SOURCE_DIR="$source_dir" \
+      LFG_FZF_RESPONSES="$responses" \
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "recency/$shell run 1 failed"
+  fi
+
+  # Run 2: pick repo2 + branch main.
+  printf '0|repo2\n0|main\n' > "$responses"
+  if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
+      LFG_SOURCE_DIR="$source_dir" \
+      LFG_FZF_RESPONSES="$responses" \
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "recency/$shell run 2 failed"
+  fi
+
+  # Run 3: capture offered candidates; repo pick lists first, branch pick second.
+  printf '0|repo\n0|main\n' > "$responses"
+  if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
+      LFG_SOURCE_DIR="$source_dir" \
+      LFG_FZF_RESPONSES="$responses" \
+      LFG_FZF_STDIN_LOG="$stdin_log" \
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "recency/$shell run 3 failed"
+  fi
+
+  assert_eq "$(sed -n '1p' "$stdin_log")" "repo2" "recency/$shell most recent repo first"
+  assert_eq "$(sed -n '3p' "$stdin_log")" "feat/existing" "recency/$shell most recent branch first"
+
+  echo "ok - recency/$shell"
+}
+
+run_recency_entrypoint_case() {
+  local shell="$1"
+  local tmp="$tmp_root/recency-entrypoint-$shell"
+  local source_dir="$tmp/src"
+  local bin_dir="$tmp/bin"
+  local responses="$tmp/fzf-responses"
+  local stdin_log="$tmp/fzf.stdin"
+  local output_file="$tmp/agent.out"
+  local stderr_file="$tmp/lfg.err"
+  local script="$tmp/case.$shell"
+  local start_dir
+
+  if skip_if_missing_shell "$shell" "recency-entrypoint/$shell"; then
+    return 0
+  fi
+
+  mkdir -p "$bin_dir"
+  write_fake_fzf "$bin_dir"
+  write_fake_agents "$bin_dir" kimi codex
+  setup_repo "$tmp"
+  start_dir="$source_dir/.agents/worktrees/repo-feat-start/repo"
+
+  shell_script_for "$shell" "$script" "$start_dir" "lfg"
+
+  # Run 1: pick kimi, which records it as the most recent entrypoint.
+  printf '0|kimi\n' > "$responses"
+  if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
+      LFG_SOURCE_DIR="$source_dir" \
+      LFG_SMART_MODE=1 \
+      LFG_FZF_RESPONSES="$responses" \
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "recency-entrypoint/$shell run 1 failed"
+  fi
+
+  # Run 2: pick codex; the offered candidates must rank kimi first.
+  printf '0|codex\n' > "$responses"
+  if ! PATH="$bin_dir:$ROOT/tests:$PATH" \
+      LFG_SOURCE_DIR="$source_dir" \
+      LFG_SMART_MODE=1 \
+      LFG_FZF_RESPONSES="$responses" \
+      LFG_FZF_STDIN_LOG="$stdin_log" \
+      run_shell_script "$shell" "$script"; then
+    dump_output "$output_file" "$stderr_file"
+    fail "recency-entrypoint/$shell run 2 failed"
+  fi
+
+  assert_eq "$(sed -n '1p' "$stdin_log")" "kimi" "recency-entrypoint/$shell most recent entrypoint first"
+  assert_eq "$(field agent "$output_file")" "codex" "recency-entrypoint/$shell launched picked entrypoint"
+
+  echo "ok - recency-entrypoint/$shell"
 }
 
 run_lfg_update_bash_case() {
@@ -1215,6 +1296,7 @@ EOF
 }
 
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/lfg-tests.XXXXXX")"
+export LFG_STORE_DIR="$tmp_root/store"
 shells=(bash zsh fish)
 
 for shell in "${shells[@]}"; do
@@ -1226,6 +1308,8 @@ for shell in "${shells[@]}"; do
   run_lfg_smart_mode_case "$shell"
   run_lfg_smart_mode_no_entrypoints_case "$shell"
   run_lfg_smart_mode_explicit_entrypoint_case "$shell"
+  run_recency_ranking_case "$shell"
+  run_recency_entrypoint_case "$shell"
   run_lfg_help_case "$shell"
   run_lfg_version_case "$shell"
   run_worktree_version_case "$shell"

@@ -128,33 +128,24 @@ assert_file_contains_before() {
   fi
 }
 
-write_fake_command() {
+write_fake_fzf() {
   local bin_dir="$1"
-  local command_name="$2"
 
-  cat > "$bin_dir/$command_name" <<'EOF'
+  cat > "$bin_dir/fzf" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
-  chmod +x "$bin_dir/$command_name"
+  chmod +x "$bin_dir/fzf"
 }
 
-write_fake_fzf() {
-  write_fake_command "$1" fzf
-}
-
-write_fake_gum() {
-  write_fake_command "$1" gum
-}
-
-write_fake_brew() {
+write_fake_brew_installs_fzf() {
   local bin_dir="$1"
 
   cat > "$bin_dir/brew" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 2 ] || [ "$1" != "install" ]; then
+if [ "$#" -ne 2 ] || [ "$1" != "install" ] || [ "$2" != "fzf" ]; then
   echo "fake brew: unexpected command: $*" >&2
   exit 1
 fi
@@ -162,13 +153,12 @@ fi
 : "${LFG_FAKE_BREW_LOG:?LFG_FAKE_BREW_LOG must be set}"
 : "${LFG_FAKE_BREW_BIN_DIR:?LFG_FAKE_BREW_BIN_DIR must be set}"
 
-package="$2"
 printf '%s\n' "$*" >> "$LFG_FAKE_BREW_LOG"
-cat > "$LFG_FAKE_BREW_BIN_DIR/$package" <<'PKG'
+cat > "$LFG_FAKE_BREW_BIN_DIR/fzf" <<'FZF'
 #!/usr/bin/env bash
 exit 0
-PKG
-chmod +x "$LFG_FAKE_BREW_BIN_DIR/$package"
+FZF
+chmod +x "$LFG_FAKE_BREW_BIN_DIR/fzf"
 EOF
   chmod +x "$bin_dir/brew"
 }
@@ -246,7 +236,6 @@ run_install_auto_detect_case() {
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
   write_fake_fzf "$bin_dir"
-  write_fake_gum "$bin_dir"
 
   install_args=(--install-dir "$install_dir")
   if [ -n "$install_shell" ]; then
@@ -365,7 +354,6 @@ run_install_preserves_hook_case() {
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
   write_fake_fzf "$bin_dir"
-  write_fake_gum "$bin_dir"
   install_args=(--install-dir "$install_dir" --install-shell "$install_shell")
 
   case "$method" in
@@ -412,7 +400,6 @@ run_install_idempotent_case() {
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
   write_fake_fzf "$bin_dir"
-  write_fake_gum "$bin_dir"
   install_args=(--install-dir "$install_dir" --install-shell "$install_shell")
 
   HOME="$home" \
@@ -494,7 +481,6 @@ run_install_replaces_install_dir_case() {
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
   write_fake_fzf "$bin_dir"
-  write_fake_gum "$bin_dir"
   install_args=(--install-dir "$install_dir" --install-shell "$install_shell")
 
   case "$method" in
@@ -534,6 +520,37 @@ run_install_replaces_install_dir_case() {
   echo "ok - install/replaces-install-dir-$method"
 }
 
+run_install_preserves_store_case() {
+  local tmp="$tmp_root/install-preserves-store"
+  local home="$tmp/home"
+  local zdotdir="$tmp/zdot"
+  local xdg_config_home="$tmp/xdg"
+  local install_dir="$home/lfg"
+  local bin_dir="$tmp/bin"
+  local recency_file="$install_dir/store/recency"
+  local output_file="$tmp/install.out"
+  local recency_line="3	entrypoint		kimi"
+
+  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$(dirname "$recency_file")"
+  write_fake_fzf "$bin_dir"
+  printf '%s\n' "$recency_line" > "$recency_file"
+
+  if ! HOME="$home" \
+      ZDOTDIR="$zdotdir" \
+      XDG_CONFIG_HOME="$xdg_config_home" \
+      PATH="$bin_dir:$PATH" \
+      bash "$ROOT/install.sh" --install-dir "$install_dir" --install-shell zsh > "$output_file" 2>&1; then
+    cat "$output_file" >&2 || true
+    fail "install/preserves-store failed"
+  fi
+
+  assert_install_dir_contains_release_tree "$install_dir" "install/preserves-store release tree"
+  assert_file_exists "$recency_file" "install/preserves-store kept recency store"
+  assert_eq "$(cat "$recency_file")" "$recency_line" "install/preserves-store kept recency contents"
+
+  echo "ok - install/preserves-store"
+}
+
 run_install_source_dir_prompt_case() {
   local tmp="$tmp_root/install-source-dir-prompt"
   local home="$tmp/home"
@@ -553,7 +570,6 @@ run_install_source_dir_prompt_case() {
     "$zdotdir" \
     "$xdg_config_home"
   write_fake_fzf "$bin_dir"
-  write_fake_gum "$bin_dir"
 
   if ! printf 'y\n' | env -u LFG_SOURCE_DIR \
       HOME="$home" \
@@ -584,7 +600,6 @@ run_install_local_version_case() {
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir"
   write_fake_fzf "$bin_dir"
-  write_fake_gum "$bin_dir"
 
   if ! HOME="$home" \
       ZDOTDIR="$zdotdir" \
@@ -619,7 +634,6 @@ run_install_remote_from_temp_case() {
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$archive_dir"
   write_fake_release_curl "$bin_dir"
   write_fake_fzf "$bin_dir"
-  write_fake_gum "$bin_dir"
 
   cp "$ROOT/install.sh" "$temp_install_script"
 
@@ -668,7 +682,6 @@ run_install_remote_release_case() {
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$bin_dir" "$archive_dir"
   write_fake_release_curl "$bin_dir"
   write_fake_fzf "$bin_dir"
-  write_fake_gum "$bin_dir"
 
   LFG_DIST_DIR="$archive_dir" "$ROOT/scripts/release.sh" 2.0.0 >/dev/null
   LFG_DIST_DIR="$archive_dir" "$ROOT/scripts/release.sh" latest >/dev/null
@@ -720,8 +733,7 @@ run_install_dependencies_brew_fzf_case() {
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$install_dir" "$bin_dir"
   printf 'stale\n' > "$stale_file"
-  write_fake_brew "$bin_dir"
-  write_fake_gum "$bin_dir"
+  write_fake_brew_installs_fzf "$bin_dir"
   write_minimal_path_command_links "$bin_dir"
 
   bash_bin="$(command -v bash)" || fail "install/dependencies-brew-fzf: bash not found"
@@ -791,8 +803,7 @@ run_install_dependencies_brew_reject_case() {
 
   mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$install_dir" "$bin_dir"
   printf 'stale\n' > "$stale_file"
-  write_fake_brew "$bin_dir"
-  write_fake_gum "$bin_dir"
+  write_fake_brew_installs_fzf "$bin_dir"
   write_minimal_path_command_links "$bin_dir"
 
   bash_bin="$(command -v bash)" || fail "install/dependencies-brew-reject: bash not found"
@@ -815,78 +826,10 @@ run_install_dependencies_brew_reject_case() {
   echo "ok - install/dependencies-brew-reject"
 }
 
-run_install_dependencies_brew_gum_case() {
-  local tmp="$tmp_root/install-dependencies-brew-gum"
-  local home="$tmp/home"
-  local zdotdir="$tmp/zdot"
-  local xdg_config_home="$tmp/xdg"
-  local install_dir="$home/lfg"
-  local bin_dir="$tmp/bin"
-  local brew_log="$tmp/brew.log"
-  local output_file="$tmp/install.out"
-  local bash_bin
-
-  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$install_dir" "$bin_dir"
-  write_fake_fzf "$bin_dir"
-  write_fake_brew "$bin_dir"
-  write_minimal_path_command_links "$bin_dir"
-
-  bash_bin="$(command -v bash)" || fail "install/dependencies-brew-gum: bash not found"
-
-  if ! printf 'y\n' | HOME="$home" \
-      ZDOTDIR="$zdotdir" \
-      XDG_CONFIG_HOME="$xdg_config_home" \
-      PATH="$bin_dir" \
-      LFG_FAKE_BREW_LOG="$brew_log" \
-      LFG_FAKE_BREW_BIN_DIR="$bin_dir" \
-      "$bash_bin" "$ROOT/install.sh" --install-dir "$install_dir" --install-shell zsh > "$output_file" 2>&1; then
-    cat "$output_file" >&2 || true
-    fail "install/dependencies-brew-gum failed"
-  fi
-
-  assert_file_contains "$output_file" "Install it with 'brew install gum'?" "install/dependencies-brew-gum prompt"
-  assert_file_contains "$brew_log" "install gum" "install/dependencies-brew-gum brew command"
-  assert_install_dir_contains_release_tree "$install_dir" "install/dependencies-brew-gum release tree"
-
-  echo "ok - install/dependencies-brew-gum"
-}
-
-run_install_dependencies_missing_gum_case() {
-  local tmp="$tmp_root/install-dependencies-missing-gum"
-  local home="$tmp/home"
-  local zdotdir="$tmp/zdot"
-  local xdg_config_home="$tmp/xdg"
-  local install_dir="$home/lfg"
-  local bin_dir="$tmp/bin"
-  local output_file="$tmp/install.out"
-  local bash_bin
-
-  mkdir -p "$home" "$zdotdir" "$xdg_config_home" "$install_dir" "$bin_dir"
-  write_fake_fzf "$bin_dir"
-  write_minimal_path_command_links "$bin_dir"
-
-  bash_bin="$(command -v bash)" || fail "install/dependencies-missing-gum: bash not found"
-
-  if HOME="$home" \
-      ZDOTDIR="$zdotdir" \
-      XDG_CONFIG_HOME="$xdg_config_home" \
-      PATH="$bin_dir" \
-      "$bash_bin" "$ROOT/install.sh" --install-dir "$install_dir" --install-shell zsh > "$output_file" 2>&1; then
-    cat "$output_file" >&2 || true
-    fail "install/dependencies-missing-gum: expected missing gum to fail"
-  fi
-
-  assert_file_contains "$output_file" "gum is required. Install gum and rerun install.sh." "install/dependencies-missing-gum error"
-
-  echo "ok - install/dependencies-missing-gum"
-}
-
 run_install_dependencies_cases() {
   run_install_dependencies_brew_fzf_case
   run_install_dependencies_missing_fzf_case
   run_install_dependencies_brew_reject_case
-  run_install_dependencies_brew_gum_case
-  run_install_dependencies_missing_gum_case
 }
 
 run_install_cases() {
@@ -905,6 +848,8 @@ run_install_cases() {
 
   run_install_replaces_install_dir_case "zsh" "zsh"
   run_install_replaces_install_dir_case "bash" "bash"
+
+  run_install_preserves_store_case
 
   run_install_preserves_hook_case "zsh" "zsh"
   run_install_preserves_hook_case "bash" "bash"

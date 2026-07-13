@@ -196,6 +196,63 @@ function _worktree_fzf
     fzf --print-query --border=rounded --border-label="$label" --prompt="$prompt" --height=40% --reverse
 end
 
+function _worktree_recency_file
+    if set -q LFG_STORE_DIR; and test -n "$LFG_STORE_DIR"
+        echo "$LFG_STORE_DIR/recency"
+        return
+    end
+
+    # Resolve symlinks like _lfg_version so the store follows the install dir.
+    set -l script_path (status filename)
+    if test -L "$script_path"
+        set script_path (readlink "$script_path")
+    end
+    set -l install_dir (dirname (dirname "$script_path"))
+    echo "$install_dir/store/recency"
+end
+
+# Record a picker selection so it ranks first next time. Best effort.
+function _worktree_recency_record
+    set -l kind $argv[1]
+    set -l scope $argv[2]
+    set -l value $argv[3]
+    set -l file (_worktree_recency_file)
+
+    mkdir -p (dirname "$file")
+    or return 0
+
+    set -l next 1
+    if test -f "$file"
+        set next (awk -F'\t' '{ if ($1 + 0 > max) max = $1 + 0 } END { print max + 1 }' "$file")
+    end
+
+    set -l tmp "$file.$fish_pid"
+    begin
+        if test -f "$file"
+            awk -F'\t' -v kind="$kind" -v scope="$scope" -v value="$value" '$2 != kind || $3 != scope || $4 != value' "$file"
+        end
+        printf '%s\t%s\t%s\t%s\n' "$next" "$kind" "$scope" "$value"
+    end > "$tmp"
+    and mv "$tmp" "$file"
+end
+
+# Rank stdin candidates by recency of selection (most recent first), then name.
+function _worktree_recency_sort
+    set -l kind $argv[1]
+    set -l scope $argv[2]
+    set -l file (_worktree_recency_file)
+
+    if not test -r "$file"
+        cat
+        return
+    end
+
+    awk -F'\t' -v kind="$kind" -v scope="$scope" '
+        NR == FNR { if ($2 == kind && $3 == scope) seen[$4] = $1; next }
+        { rank = ($1 in seen) ? seen[$1] : 0; printf "%s\t%s\n", rank, $0 }
+    ' "$file" - | sort -t (printf '\t') -k1,1rn -k2,2 | cut -f2-
+end
+
 function _worktree_pick_repo
     set -l sources_dir (_worktree_sources_dir)
     if not test -d "$sources_dir"
@@ -209,7 +266,8 @@ function _worktree_pick_repo
         | while read -l repo
             basename "$repo"
         end \
-        | sort)
+        | sort \
+        | _worktree_recency_sort repo "")
     if test (count $repos) -eq 0
         echo "lfg: no git repositories found under $sources_dir" >&2
         echo "Set LFG_SOURCE_DIR to the folder that contains your cloned git repositories." >&2
@@ -226,12 +284,16 @@ function _worktree_pick_repo
     if test -z "$repo_name"
         return 1
     end
+    _worktree_recency_record repo "" "$repo_name"
     echo "$(_worktree_sources_dir)/$repo_name"
 end
 
 function _worktree_pick_branch
+    set -l scope (_worktree_parent_path)
+
     set -l out (git worktree list --porcelain \
         | awk '/^branch / { sub("refs/heads/", "", $2); print $2 }' \
+        | _worktree_recency_sort branch "$scope" \
         | _worktree_fzf ' Select or create worktree branch ' 'worktree> ')
     set -l code $status
 
@@ -244,6 +306,7 @@ function _worktree_pick_branch
     if test -z "$branch"
         return 1
     end
+    _worktree_recency_record branch "$scope" "$branch"
     echo "$branch"
 end
 

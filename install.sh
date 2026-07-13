@@ -249,11 +249,22 @@ validate_install_dir() {
 }
 
 reset_install_dir() {
+  local store_backup=""
+
   validate_install_dir "$INSTALL_DIR"
 
   logger "INFO" "Resetting install directory: $INSTALL_DIR"
+  if [ -d "$INSTALL_DIR/store" ]; then
+    store_backup="$(mktemp -d "${TMPDIR:-/tmp}/lfg-store.XXXXXX")"
+    mv "$INSTALL_DIR/store" "$store_backup/store"
+  fi
   rm -rf "$INSTALL_DIR"
   mkdir -p "$INSTALL_DIR"
+  if [ -n "$store_backup" ]; then
+    mv "$store_backup/store" "$INSTALL_DIR/store"
+    rm -rf "$store_backup"
+    logger "INFO" "Preserved store directory: $INSTALL_DIR/store"
+  fi
   logger "INFO" "Install directory ready: $INSTALL_DIR"
 }
 
@@ -348,39 +359,19 @@ prompt_reply() {
   fi
 }
 
-prompt_to_install_with_brew() {
-  local package="$1"
-
-  prompt_reply "$package is required but was not found. Install it with 'brew install $package'? [y/N] "
+prompt_to_install_fzf_with_brew() {
+  prompt_reply "fzf is required but was not found. Install it with 'brew install fzf'? [y/N] "
   case "$PROMPT_REPLY" in
     y|Y|yes|YES|Yes)
-      logger "INFO" "Installing $package via Homebrew"
-      brew install "$package"
-      logger "INFO" "$package installed via Homebrew"
+      logger "INFO" "Installing fzf via Homebrew"
+      brew install fzf
+      logger "INFO" "fzf installed via Homebrew"
       ;;
     *)
-      logger "ERROR" "$package is required. Install $package and rerun install.sh."
+      logger "ERROR" "fzf is required. Install fzf and rerun install.sh."
       exit 1
       ;;
   esac
-}
-
-require_command() {
-  local command_name="$1"
-
-  if command -v "$command_name" >/dev/null 2>&1; then
-    logger "INFO" "$command_name is available"
-    return 0
-  fi
-
-  logger "WARN" "$command_name not found in PATH"
-  if command -v brew >/dev/null 2>&1; then
-    logger "INFO" "Homebrew detected; offering to install $command_name"
-    prompt_to_install_with_brew "$command_name"
-  else
-    logger "ERROR" "$command_name is required. Install $command_name and rerun install.sh."
-    exit 1
-  fi
 }
 
 check_dependencies() {
@@ -392,8 +383,18 @@ check_dependencies() {
   fi
   logger "INFO" "git is available"
 
-  require_command fzf
-  require_command gum
+  if ! command -v fzf >/dev/null 2>&1; then
+    logger "WARN" "fzf not found in PATH"
+    if command -v brew >/dev/null 2>&1; then
+      logger "INFO" "Homebrew detected; offering to install fzf"
+      prompt_to_install_fzf_with_brew
+    else
+      logger "ERROR" "fzf is required. Install fzf and rerun install.sh."
+      exit 1
+    fi
+  else
+    logger "INFO" "fzf is available"
+  fi
 }
 
 maybe_add_lfg_source_dir_to_file() {

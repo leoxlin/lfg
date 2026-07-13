@@ -231,6 +231,53 @@ function _worktree_fzf() {
   FZF_DEFAULT_OPTS="$opts" fzf --print-query --border=rounded --border-label="$label" --prompt="$prompt" --height=40% --reverse
 }
 
+function _worktree_recency_file() {
+  echo "${LFG_STORE_DIR:-$__lfg_dir/store}/recency"
+}
+
+# Record a picker selection so it ranks first next time. Best effort.
+function _worktree_recency_record() {
+  local kind="$1"
+  local scope="$2"
+  local value="$3"
+  local file next tmp
+
+  file="$(_worktree_recency_file)"
+  mkdir -p "$(dirname "$file")" || return 0
+
+  next=1
+  if [ -f "$file" ]; then
+    next="$(awk -F'\t' '{ if ($1 + 0 > max) max = $1 + 0 } END { print max + 1 }' "$file")"
+  fi
+
+  tmp="$file.$$"
+  {
+    if [ -f "$file" ]; then
+      awk -F'\t' -v kind="$kind" -v scope="$scope" -v value="$value" \
+        '$2 != kind || $3 != scope || $4 != value' "$file"
+    fi
+    printf '%s\t%s\t%s\t%s\n' "$next" "$kind" "$scope" "$value"
+  } > "$tmp" && mv "$tmp" "$file"
+}
+
+# Rank stdin candidates by recency of selection (most recent first), then name.
+function _worktree_recency_sort() {
+  local kind="$1"
+  local scope="$2"
+  local file
+
+  file="$(_worktree_recency_file)"
+  if [ ! -r "$file" ]; then
+    cat
+    return
+  fi
+
+  awk -F'\t' -v kind="$kind" -v scope="$scope" '
+    NR == FNR { if ($2 == kind && $3 == scope) seen[$4] = $1; next }
+    { rank = ($1 in seen) ? seen[$1] : 0; printf "%s\t%s\n", rank, $0 }
+  ' "$file" - | sort -t $'\t' -k1,1rn -k2,2 | cut -f2-
+}
+
 function _worktree_pick_repo() {
   local sources_dir repos out code repo_name
 
@@ -244,7 +291,8 @@ function _worktree_pick_repo() {
   repos="$(find "$sources_dir" -mindepth 1 -maxdepth 1 -type d \
       -exec test -e '{}/.git' ';' -print 2>/dev/null \
     | while IFS= read -r repo; do basename "$repo"; done \
-    | sort)"
+    | sort \
+    | _worktree_recency_sort repo "")"
   if [ -z "$repos" ]; then
     echo "lfg: no git repositories found under $sources_dir" >&2
     echo "Set LFG_SOURCE_DIR to the folder that contains your cloned git repositories." >&2
@@ -257,14 +305,18 @@ function _worktree_pick_repo() {
 
   repo_name="$(printf '%s\n' "$out" | tail -n1)"
   [ -n "$repo_name" ] || return 1
+  _worktree_recency_record repo "" "$repo_name"
   echo "$(_worktree_sources_dir)/$repo_name"
 }
 
 function _worktree_pick_branch() {
-  local out code branch
+  local out code branch scope
+
+  scope="$(_worktree_parent_path)"
 
   out="$(git worktree list --porcelain \
     | awk '/^branch / { sub("refs/heads/", "", $2); print $2 }' \
+    | _worktree_recency_sort branch "$scope" \
     | _worktree_fzf ' Select or create worktree branch ' 'worktree> ')"
   code=$?
 
@@ -273,6 +325,7 @@ function _worktree_pick_branch() {
 
   branch="$(printf '%s\n' "$out" | tail -n1)"
   [ -n "$branch" ] || return 1
+  _worktree_recency_record branch "$scope" "$branch"
   echo "$branch"
 }
 
@@ -609,22 +662,26 @@ function _lfg_available_entrypoints() {
 }
 
 function _lfg_pick_entrypoint() {
-  local entrypoints entrypoint
+  local entrypoints out code entrypoint
 
-  entrypoints="$(_lfg_available_entrypoints)"
+  entrypoints="$(_lfg_available_entrypoints | _worktree_recency_sort entrypoint "")"
   if [ -z "$entrypoints" ]; then
     echo "lfg: no available agent entrypoints found on PATH" >&2
     return 1
   fi
 
-  if ! command -v gum >/dev/null 2>&1; then
-    echo "lfg: gum is required to pick an entrypoint" >&2
-    echo "Install gum: https://github.com/charmbracelet/gum" >&2
+  if ! command -v fzf >/dev/null 2>&1; then
+    echo "lfg: fzf is required to pick an entrypoint" >&2
     return 1
   fi
 
-  entrypoint="$(printf '%s\n' "$entrypoints" | gum choose --header ' Select an agent ')" || return 1
+  out="$(printf '%s\n' "$entrypoints" | _worktree_fzf ' Select an agent ' 'agent> ')"
+  code=$?
+  [ "$code" -eq 0 ] || return 1
+
+  entrypoint="$(printf '%s\n' "$out" | tail -n1)"
   [ -n "$entrypoint" ] || return 1
+  _worktree_recency_record entrypoint "" "$entrypoint"
   echo "$entrypoint"
 }
 
